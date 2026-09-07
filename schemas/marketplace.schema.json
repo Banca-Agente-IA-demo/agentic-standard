@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-standard.bcp.internal/schemas/marketplace/1.0",
+  "title": "marketplace.json: el índice desde el que los clientes instalan",
+  "description": "Contrato del archivo GENERADO por rebuild-index.yml en agentic-marketplace (producción) y agentic-marketplace-exp (experimental). No lo escribe una persona. DOS PROYECCIONES DEL MISMO ÍNDICE, NO DOS ÍNDICES: .claude-plugin/marketplace.json para Claude Code y .github/plugin/marketplace.json para Copilot CLI, con la misma lista de unidades; se diferencian SÓLO en cómo se direcciona una unidad que vive en un subdirectorio del repositorio de dominio, porque los dos clientes no aceptan lo mismo. DIVERGENCIA MEDIDA que este esquema protege: Copilot RECHAZA la fuente git-subdir, y Claude Code acepta github con path pero LO IGNORA e instala el repositorio entero sin dar error. El validador elige la proyección por la ruta del archivo. Heredado de la demo (Banca-Copilot-demo) con dos correcciones: la versión de cada unidad admite sufijo de prelanzamiento, porque el índice experimental lista exactamente esas versiones (0.1.0-beta.1), y los identificadores pasan a inglés.",
+  "$comment": "POR QUÉ sha ADEMÁS DE ref: cuando están los dos, el cliente usa sha. Una referencia móvil significa que dos personas que instalan el mismo día pueden recibir código distinto, y entonces la atestación no corresponde a lo instalado. El índice publica los dos: sha fija lo que se instala hoy y ref documenta la etiqueta de la que salió. Que el sha exista, que la etiqueta exista y que la unidad siga en esa ruta son comprobaciones contra el mundo, no contra la forma del documento: las hace el generador del índice.",
+  "not": {},
+  "$comment_root": "LA RAÍZ RECHAZA TODO A PROPÓSITO (not: {}). No hay un único esquema válido para un índice: la validez depende del cliente al que va dirigido. Si la raíz no impusiera nada, un validador apuntado aquí por error PASARÍA EN VACÍO. Se referencia por puntero: marketplace.schema.json#/projections/claudeCode y #/projections/copilot.",
+  "$defs": {
+    "semverStrict": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "description": "SemVer 2.0.0 sin sufijo. Para la versión del índice."
+    },
+    "semverWithPrerelease": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)(\\.(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))*)?$",
+      "description": "SemVer 2.0.0 con sufijo de prelanzamiento opcional y sin metadatos de compilación. El sufijo decide el canal (02 §7.1): con sufijo, sólo el índice experimental; sin sufijo, ambos."
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "email"],
+      "description": "A quién se reclama cuando el índice publica algo que no debería.",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "email": { "type": "string", "format": "email" }
+      }
+    },
+    "indexMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Campo libre del formato que Claude Code no lee. Aquí va la descripción y la versión del ÍNDICE, no de las unidades que lista.",
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "version": { "$ref": "#/$defs/semverStrict" }
+      }
+    },
+    "pluginIdentity": {
+      "type": "object",
+      "required": ["name", "description", "version", "source"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Cómo se instala: name@marketplace. Es la segunda mitad del id de GOVERNANCE.json y el name de plugin.json. Dos entradas del mismo índice no pueden compartirlo; JSON Schema no puede exigir unicidad dentro de un array, lo comprueba el generador."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Lo que el usuario lee para decidir si instala. Copiada de plugin.json."
+        },
+        "version": {
+          "$ref": "#/$defs/semverWithPrerelease",
+          "description": "DEBE coincidir con version de plugin.json y con la etiqueta del release. El generador la copia; no se teclea. Cada índice lista UNA versión por unidad: la última sin sufijo en producción, la última con sufijo en experimental."
+        }
+      }
+    },
+    "wholeRepositorySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "repo"],
+      "description": "El repositorio ENTERO es la unidad: su manifiesto está en la raíz. Válida en las dos proyecciones. En la organización de BCP no ocurre, porque los repositorios de dominio alojan varias unidades; se conserva por completitud del formato.",
+      "properties": {
+        "source": { "const": "github" },
+        "repo": { "type": "string", "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", "description": "propietario/repositorio, sin URL y sin .git." },
+        "ref": { "type": "string", "minLength": 1 },
+        "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "claudeCodeSubdirectorySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "url", "path"],
+      "description": "Unidad en un subdirectorio, direccionada como Claude Code la honra: git-subdir, la ÚNICA fuente suya que respeta un subdirectorio. Lleva url completa porque clona por git, no por la API.",
+      "properties": {
+        "source": { "const": "git-subdir" },
+        "url": { "type": "string", "pattern": "^https://[^\\s]+\\.git$", "description": "URL de clonado terminada en .git." },
+        "path": { "type": "string", "pattern": "^[^/][^\\s]*[^/]$", "description": "Directorio de la unidad dentro del repositorio, relativo, sin barras en los extremos: plugins/cnf-migration-flow o skills/demo-sdlc-revisar-jql." },
+        "ref": { "type": "string", "minLength": 1 },
+        "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "copilotSubdirectorySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "repo", "path"],
+      "description": "La misma unidad en subdirectorio, direccionada como Copilot la entiende: github más path. Es exactamente la combinación que la proyección de Claude Code prohíbe, y no es contradicción: es la divergencia medida entre clientes.",
+      "properties": {
+        "source": { "const": "github" },
+        "repo": { "type": "string", "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$" },
+        "path": { "type": "string", "pattern": "^[^/][^\\s]*[^/]$" },
+        "ref": { "type": "string", "minLength": 1 },
+        "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
+    "indexEnvelope": {
+      "type": "object",
+      "required": ["name", "owner", "plugins"],
+      "description": "La forma común a las dos proyecciones. Lo único que cambia entre ellas es qué fuentes admite cada entrada de plugins.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Nombre del marketplace, la segunda mitad de name@marketplace: agentic-marketplace o agentic-marketplace-exp. Renombrarlo invalida todo comando que alguien tenga escrito."
+        },
+        "owner": { "$ref": "#/$defs/owner" },
+        "metadata": { "$ref": "#/$defs/indexMetadata" },
+        "plugins": {
+          "type": "array",
+          "minItems": 1,
+          "description": "MÍNIMO UNA ENTRADA, salvaguarda medida: un índice vacío es sintácticamente válido y al publicarse desinstala de golpe todo lo que ofrecía. Si el barrido no encuentra nada, el generador falla y NO sobreescribe el índice anterior."
+        }
+      }
+    }
+  },
+  "projections": {
+    "claudeCode": {
+      "$comment": "Subesquema para .claude-plugin/marketplace.json.",
+      "$ref": "#/$defs/indexEnvelope",
+      "properties": {
+        "plugins": {
+          "items": {
+            "allOf": [{ "$ref": "#/$defs/pluginIdentity" }],
+            "properties": {
+              "source": {
+                "description": "PROHIBIDO github CON path: Claude Code lo acepta e ignora el path, instalando el repositorio completo sin error. Un subdirectorio se direcciona con git-subdir.",
+                "oneOf": [
+                  { "$ref": "#/$defs/wholeRepositorySource" },
+                  { "$ref": "#/$defs/claudeCodeSubdirectorySource" }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "copilot": {
+      "$comment": "Subesquema para .github/plugin/marketplace.json.",
+      "$ref": "#/$defs/indexEnvelope",
+      "properties": {
+        "plugins": {
+          "items": {
+            "allOf": [{ "$ref": "#/$defs/pluginIdentity" }],
+            "properties": {
+              "source": {
+                "description": "PROHIBIDO git-subdir: Copilot lo rechaza y una entrada así rompe el índice ENTERO para ese cliente. Un subdirectorio se direcciona con github más path.",
+                "oneOf": [
+                  { "$ref": "#/$defs/wholeRepositorySource" },
+                  { "$ref": "#/$defs/copilotSubdirectorySource" }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

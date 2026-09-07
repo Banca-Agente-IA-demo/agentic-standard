@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "id": "agents-quality/demo-sdlc-revisar-jql",
+  "owner": {
+    "team": "squad-sdlc",
+    "contact": "squad-sdlc@bcp.com.pe"
+  },
+  "data_classification": "internal",
+  "permissions": {
+    "tools": [],
+    "commands": [],
+    "mcp_servers": []
+  },
+  "deprecation": {
+    "superseded_by": "none",
+    "sunset_date": "2027-03-31",
+    "decided_by": "@bcp/lt-quality"
+  }
+}

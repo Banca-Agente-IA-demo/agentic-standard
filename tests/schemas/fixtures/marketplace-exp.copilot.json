@@ -1,0 +1,25 @@
+{
+  "name": "agentic-marketplace-exp",
+  "owner": {
+    "name": "Plataforma agéntica",
+    "email": "plataforma-agentica@bcp.com.pe"
+  },
+  "metadata": {
+    "description": "Canal experimental: lo lee el equipo piloto.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "cnf-migration-flow",
+      "description": "Migración asistida de Atlas a CNF.",
+      "version": "0.2.0-beta.1",
+      "source": {
+        "source": "github",
+        "repo": "Banca-Agente-IA-demo/agents-modernization",
+        "path": "plugins/cnf-migration-flow",
+        "ref": "v0.2.0-beta.1",
+        "sha": "0123456789abcdef0123456789abcdef01234567"
+      }
+    }
+  ]
+}

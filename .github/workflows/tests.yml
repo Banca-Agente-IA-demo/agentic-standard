@@ -11,6 +11,7 @@ on:
     paths:
       - "tools/**"
       - "tests/**"
+      - "schemas/**"
       - "config/teams.json"
       - "pyproject.toml"
       - ".github/workflows/tests.yml"
