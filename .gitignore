@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Entornos privados que crea el asistente en la máquina del autor
+.authoring-assistant/
+
+# Claves y credenciales: nunca en git
+*.pem
+.env
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

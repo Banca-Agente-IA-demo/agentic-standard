@@ -1,0 +1,17 @@
+{
+  "$comment": "Mapa de cada papel del ciclo de vida (01 §2, 03 §1) al slug del equipo de GitHub que lo ejerce. CODEOWNERS y el job rules leen este archivo; en BCP cambian sólo los slugs, nunca las claves.",
+  "platform_team": "platform-team",
+  "control_functions": {
+    "cybersecurity": "cybersecurity",
+    "operational_risk": "operational-risk",
+    "compliance": "compliance"
+  },
+  "pilot_team": "pilot-team",
+  "domains": {
+    "modernization": {
+      "repository": "agents-modernization",
+      "technical_lead": "lt-modernization",
+      "champion": "champion-modernization"
+    }
+  }
+}
