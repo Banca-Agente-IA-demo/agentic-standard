@@ -12,7 +12,7 @@ gobierno y sus pruebas, y pasa por el mismo validador que cualquier unidad de un
 |---|---|
 | `skills/author-unit/SKILL.md` | El punto de entrada. Corto: lo largo vive en `references/` y se carga sólo cuando hace falta |
 | `skills/author-unit/scripts/` | Los puntos de entrada de cada script: parsean argumentos, cablean adaptadores e imprimen un JSON |
-| `authoring_assistant/` | El núcleo, por capas. `domain` puro, `application` orquesta, `ports` sólo donde hay más de una implementación, `adapters` habla con el exterior |
+| `authoring_core/` | El núcleo, por capas. `domain` puro, `application` orquesta, `ports` sólo donde hay más de una implementación, `adapters` habla con el exterior |
 | `validator.lock` | La etiqueta y el commit del estándar cuyo validador se instala en el entorno privado del plugin |
 | `tests/` | Viajan con la unidad, como exige el estándar. Son inofensivas para quien la instala |
 

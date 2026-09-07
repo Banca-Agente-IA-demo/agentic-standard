@@ -8,5 +8,11 @@
   },
   "repository": "https://github.com/Banca-Agente-IA-demo/agentic-standard",
   "license": "Proprietary",
-  "keywords": []
+  "keywords": [
+    "autoria",
+    "gobierno",
+    "publicacion",
+    "estandar-agentico",
+    "spec-driven"
+  ]
 }

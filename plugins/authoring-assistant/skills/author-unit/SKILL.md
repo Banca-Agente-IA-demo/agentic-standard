@@ -1,7 +1,7 @@
 ---
 name: author-unit
 description: Acompaña a crear, modificar o deprecar una unidad publicable del estándar agéntico. Úsalo cuando alguien quiera publicar un skill, un agente, un prompt, unos hooks o una configuración MCP, o cambiar o retirar uno que ya existe.
-compatibility: Requires Python 3.11+, git, gh with an active session
+compatibility: Necesita Python 3.11 o superior, git, y gh con una sesión activa
 ---
 
 # Autoría de una unidad publicable

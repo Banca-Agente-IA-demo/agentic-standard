@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_ROOT = PLUGIN_ROOT / "authoring_assistant"
+PACKAGE_ROOT = PLUGIN_ROOT / "authoring_core"
 LAYERS = ("domain", "application", "ports", "adapters")
 
 # Lo que la biblioteca estándar ofrece y el asistente puede usar. Cualquier otra cosa sería una
@@ -39,9 +39,9 @@ def _imported_roots(module: Path) -> set[str]:
 
 
 def test_el_paquete_se_importa_sin_instalar_nada():
-    import authoring_assistant
+    import authoring_core
 
-    assert Path(authoring_assistant.__file__).parent == PACKAGE_ROOT
+    assert Path(authoring_core.__file__).parent == PACKAGE_ROOT
 
 
 def test_cada_capa_del_diseño_existe_y_dice_de_que_se_hace_cargo():
@@ -55,7 +55,7 @@ def test_el_paquete_solo_usa_la_biblioteca_estandar():
     # El autor no ejecuta pip para tener el asistente. La única instalación que ocurre alguna vez es
     # la del validador, en un entorno privado y al primer uso.
     for module in _modules(PACKAGE_ROOT):
-        externas = {r for r in _imported_roots(module) if r not in STANDARD_LIBRARY and r != "authoring_assistant"}
+        externas = {r for r in _imported_roots(module) if r not in STANDARD_LIBRARY and r != "authoring_core"}
         assert not externas, f"{module.relative_to(PLUGIN_ROOT)}: {sorted(externas)}"
 
 
@@ -70,4 +70,4 @@ def test_el_dominio_no_importa_las_otras_capas():
     for module in _modules(PACKAGE_ROOT / "domain"):
         texto = module.read_text(encoding="utf-8")
         for layer in ("application", "ports", "adapters"):
-            assert f"authoring_assistant.{layer}" not in texto, f"{module.name} importa {layer}"
+            assert f"authoring_core.{layer}" not in texto, f"{module.name} importa {layer}"
