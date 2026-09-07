@@ -16,7 +16,7 @@ prompts, agentes, configuraciones MCP, hooks) y los controles que lo hacen exigi
 | `evals/` | Conexión del motor de evaluación con el asistente |
 | `templates/` | El punto de partida de una unidad, agrupada o individual, y de cada tipo de artefacto. Los huecos se marcan con `<<NOMBRE>>` |
 | `docs/` | La norma (`guidelines/`), el diseño (`design/`), las guías (`guides/`) y el material de gobierno |
-| `plugins/` | Los asistentes de autoría y de consumo, que pasan por las mismas reglas que publican |
+| `plugins/` | Los asistentes de autoría y de consumo, que pasan por las mismas reglas que publican. `tests/test_self_governance.py` lo comprueba en cada cambio |
 | `config/teams.json` | Mapa de cada papel del ciclo de vida al equipo de GitHub que lo ejerce |
 | `tools/` | Herramientas del equipo de plataforma, no distribuibles: `smoke_org`, la prueba de humo de la organización |
 

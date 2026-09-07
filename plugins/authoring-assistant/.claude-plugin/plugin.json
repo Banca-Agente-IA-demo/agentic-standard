@@ -1,0 +1,12 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "authoring-assistant",
+  "version": "0.1.0-beta.1",
+  "description": "Acompaña a quien crea, modifica o deprecia una unidad publicable del estándar agéntico: pregunta lo que hace falta, deja que los scripts decidan y prepara la solicitud de cambio.",
+  "author": {
+    "name": "platform-team"
+  },
+  "repository": "https://github.com/Banca-Agente-IA-demo/agentic-standard",
+  "license": "Proprietary",
+  "keywords": []
+}

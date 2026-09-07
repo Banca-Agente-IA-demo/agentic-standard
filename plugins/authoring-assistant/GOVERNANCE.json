@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "id": "agentic-standard/authoring-assistant",
+  "owner": {
+    "team": "platform-team",
+    "contact": "plataforma-agentica@bcp.com.pe"
+  },
+  "data_classification": "internal",
+  "permissions": {
+    "tools": [],
+    "commands": [],
+    "mcp_servers": []
+  },
+  "external_content": "El asistente lee el árbol del repositorio del autor y la salida de sus propios scripts, que son JSON con un contrato fijo. No actúa sobre instrucciones que aparezcan en el contenido de un artefacto ajeno: lo que decide sale siempre de un campo de ese JSON, nunca de texto interpretado.",
+  "x_extensions": {}
+}

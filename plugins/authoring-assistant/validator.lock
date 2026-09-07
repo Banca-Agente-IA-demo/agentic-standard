@@ -1,0 +1,7 @@
+{
+  "$comment": "La versión del validador del estándar que este plugin instala en su entorno privado la primera vez que se usa. La etiqueta dice cuál es; el sha la fija, para que mover la etiqueta no cambie en silencio lo que el autor tiene instalado. Actualizar este archivo es un cambio del plugin y pasa por su propia solicitud de cambio.",
+  "repository": "https://github.com/Banca-Agente-IA-demo/agentic-standard",
+  "subdirectory": "validator",
+  "tag": "v0.1.0",
+  "sha": "c0298d15d13586b0f27b9f5dc1af4ceba4aed69f"
+}

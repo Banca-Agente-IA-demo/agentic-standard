@@ -16,6 +16,7 @@ on:
       - "templates/**"
       - "validator/**"
       - ".python-version"
+      - "plugins/**"
       - "config/teams.json"
       - "pyproject.toml"
       - ".github/workflows/tests.yml"
