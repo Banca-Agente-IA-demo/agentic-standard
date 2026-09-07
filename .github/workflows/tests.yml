@@ -1,8 +1,9 @@
 # Pruebas de las herramientas del estándar en cada PR a main que las toque.
 #
-# Un evento (pull_request), un job (tests). Matriz 3.11 y 3.12: el 3.11 es el suelo declarado en
-# pyproject.toml y protege al asistente de autoría hasta medir el Python de BCP; el 3.12 es la versión
-# de desarrollo. Acciones de terceros por SHA (constitución VII). Sin secretos.
+# Un evento (pull_request), un job (tests). La matriz prueba dos versiones a propósito: el suelo que
+# declara `.python-version`, que protege al asistente de autoría hasta medir el Python de BCP, y la de
+# desarrollo. `tests/test_python_version.py` comprueba que el suelo de la matriz sigue al del archivo.
+# Acciones de terceros por SHA (constitución VII). Sin secretos.
 name: tests
 
 on:
@@ -14,6 +15,7 @@ on:
       - "schemas/**"
       - "templates/**"
       - "validator/**"
+      - ".python-version"
       - "config/teams.json"
       - "pyproject.toml"
       - ".github/workflows/tests.yml"

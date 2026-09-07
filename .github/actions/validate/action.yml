@@ -6,6 +6,10 @@
 # organización y llega con el árbol del estándar dentro, así que el validador se instala DESDE ESE
 # ÁRBOL y no de la red: nadie teclea una versión y la del validador no puede separarse de la del
 # workflow que lo invoca.
+#
+# Por lo mismo, la versión de Python sale de `.python-version` del estándar y no de un valor escrito
+# aquí: un reutilizable no puede leer un archivo de su propio repositorio, pero una composite action sí
+# lo alcanza por su ruta de acción. Un solo sitio donde cambiar el número.
 name: validate
 description: Aplica las reglas del estándar agéntico a una unidad publicable o a las que un cambio toca.
 
@@ -20,18 +24,14 @@ inputs:
       Vacío comprueba la unidad indicada en path.
     required: false
     default: ""
-  python-version:
-    description: Versión de Python. Por defecto la mínima que el estándar declara, no la de desarrollo.
-    required: false
-    default: "3.11"
 
 runs:
   using: composite
   steps:
-    - name: Instalar Python ${{ inputs.python-version }}
+    - name: Instalar la versión de Python que el estándar declara
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
-        python-version: ${{ inputs.python-version }}
+        python-version-file: ${{ github.action_path }}/../../../.python-version
 
     - name: Instalar el validador desde el árbol del estándar que trae esta action
       shell: bash
