@@ -15,7 +15,9 @@ build/
 # Integración de Spec Kit con el cliente de desarrollo: se regenera con
 # `specify init --here --integration claude`. La constitución y las specs
 # (.specify/, specs/) sí van en git: son la trazabilidad del repositorio.
-.claude/
+# Anclado a la raíz: una carpeta .claude/ dentro de plugins/ es contenido
+# distribuible y sí se versiona.
+/.claude/
 
 # Claves y credenciales: nunca en git
 *.pem
