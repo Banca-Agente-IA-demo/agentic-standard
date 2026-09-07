@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-standard.bcp.internal/schemas/governance/1.0",
+  "title": "GOVERNANCE.json: las decisiones humanas de gobierno de una unidad publicable",
+  "description": "Contrato del archivo GOVERNANCE.json que lleva toda unidad publicable, sea plugin o artefacto individual, en su raíz junto a .claude-plugin/plugin.json. Declara sólo lo que ningún hecho puede derivar: dueño, clasificación, riesgo elevado, permisos, tratamiento de contenido externo, gobierno del servidor MCP y obsolescencia. Lo que ya está en plugin.json (identidad, versión), en el árbol (inventario), en la solicitud de cambio (aprobadores), en el check run (veredicto), en la atestación (sello) o en Port (estado, fecha de revisión, versión del estándar) NO se repite aquí. Ningún cliente lo lee; lo leen la automatización de agentic-standard y Port. Fuente: lineamiento 04 §3 y decisiones D1 a D6 de REVISION-ESQUEMAS-HITO-1.md (7 de septiembre de 2026).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "owner", "data_classification", "permissions"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0"],
+      "description": "Versión de este contrato contra la que se escribió el archivo. Sustituye a $schema (D5): en BCP los repositorios son privados y ninguna URL de esquema resolvería desde el editor; el validador lleva el esquema dentro y sólo necesita saber qué versión emparejar."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*$",
+      "description": "Identidad de gobierno con forma repo/name, por ejemplo agents-modernization/cnf-migration-flow. La primera mitad debe ser el repositorio real y la segunda el name de plugin.json; lo comprueba rules en el push, no este esquema. Es la clave interna en Port, etiquetas e issues; el usuario instala por name."
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["team", "contact"],
+      "description": "Equipo responsable, nunca una persona: las personas rotan y un dueño individual deja la unidad huérfana. Se mapea a owner_team y owner_contact en Port, nombres ya persistidos que no cambian.",
+      "properties": {
+        "team": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Slug del equipo, que debe existir en la organización de GitHub; rules lo resuelve por API."
+        },
+        "contact": {
+          "type": "string",
+          "format": "email",
+          "description": "Correo del equipo, no de una persona."
+        }
+      }
+    },
+    "data_classification": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "restricted"],
+      "description": "Clasificación del dato más sensible que la unidad toca o transporta. confidential y restricted elevan el riesgo mínimo calculado (03 §1)."
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "OPCIONAL y sólo para ELEVAR. El mínimo lo calcula rules a partir de hechos: servidor MCP con write_operations, credenciales declaradas, presencia de hooks/hooks.json, clasificación confidential o restricted. Si el campo está y es inferior al mínimo calculado, falla. Condiciona quién más aprueba y cuánto dura la aprobación (03 §1, C8)."
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tools", "commands", "mcp_servers"],
+      "description": "Declaración de permisos mínimos (C1). rules compara sólo contra lo estructurado: tools de cada agente, command de cada hook y las claves de mcpServers en .mcp.json. Sobre skills y prompts no hay nada comparable y la revisión es humana. Sin comodines. Las tres listas son obligatorias aunque estén vacías: una lista vacía afirma que no se usa nada de ese tipo, y eso se comprueba.",
+      "properties": {
+        "tools": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[^*\\s]+$" },
+          "description": "Herramientas del cliente que los agentes de la unidad pueden usar, con capacidades exactas: Read, Edit, Bash(git:*) es un patrón del cliente y se admite; un * suelto no."
+        },
+        "commands": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[^*\\s]+$" },
+          "description": "Ejecutables que los hooks y los agentes invocan: mvn, git, npm. Nombre del ejecutable, sin argumentos."
+        },
+        "mcp_servers": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 1,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "description": "Servidores MCP que la unidad usa. Como mucho uno (D2): la aprobación de Ciberseguridad y Riesgo operacional es de un contrato. Si la unidad lleva .mcp.json, este nombre es su única clave de mcpServers y la única clave del bloque mcp."
+        }
+      }
+    },
+    "external_content": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Cómo trata la unidad el contenido que no controla (resultados de búsqueda, páginas, salidas de otros sistemas, tickets) antes de actuar sobre él (C3). El esquema lo deja opcional; rules lo exige cuando C3 aplica al tipo (03 §3). El fondo lo revisa una persona."
+    },
+    "mcp": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/mcpServer" },
+      "description": "Gobierno del único servidor MCP de la unidad, indexado por su nombre, que debe ser exactamente la única clave de mcpServers en .mcp.json (D2). Obligatorio si la unidad lleva .mcp.json; prohibido si no lo lleva. Lo comprueba rules."
+    },
+    "deprecation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["superseded_by", "sunset_date", "decided_by"],
+      "description": "Anuncio de obsolescencia de la UNIDAD entera. Es la única transición de estado que decide una persona; el estado deprecated lo deriva la automatización de este bloque (02 §5). Entra en una versión de parche. Si el bloque existe, los tres campos son obligatorios.",
+      "properties": {
+        "superseded_by": {
+          "type": "string",
+          "pattern": "^([a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*|none)$",
+          "description": "id de la unidad sucesora con forma repo/name, o la cadena literal none cuando no hay reemplazo (D6). none es una decisión explícita, no un olvido. El asistente lo propone leyendo el índice."
+        },
+        "sunset_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Fecha ISO 8601 (AAAA-MM-DD) a partir de la cual la unidad pasa a retired. rules comprueba que no sea anterior a la fecha del anuncio."
+        },
+        "decided_by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Quién decidió, normalmente el Lead Técnico de dominio, en forma @org/equipo."
+        }
+      }
+    },
+    "x_extensions": {
+      "type": "object",
+      "description": "Válvula de escape visible para lo que el estándar no cubre todavía: por ejemplo hooks con eventos exclusivos de un cliente (04 §2). Sin validación de contenido. Todo lo demás del archivo rechaza claves desconocidas."
+    }
+  },
+  "$defs": {
+    "mcpServer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["write_operations", "credentials", "tools_digest"],
+      "description": "Las piezas de gobierno de un servidor MCP. La conexión (comando, URL, transporte) vive en .mcp.json y no se repite. La aprobación vive en la solicitud de cambio y su fecha de revisión en Port.",
+      "properties": {
+        "write_operations": {
+          "type": "boolean",
+          "description": "Si alguna herramienta del servidor modifica algo fuera del cliente. Es el indicador de riesgo que más pesa: true eleva el mínimo calculado."
+        },
+        "credentials": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "description": "Nombres de las variables o cabeceras que el servidor necesita, NUNCA sus valores: JIRA_TOKEN. rules las contrasta con los ${VAR} de env y headers en .mcp.json: declarar cero y usar una es error, y al revés también. Una lista no vacía eleva el riesgo mínimo."
+        },
+        "credentials_owner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["team", "access_request_url"],
+          "description": "Quién concede el acceso y dónde se pide (D2). Obligatorio cuando credentials no está vacía: la unidad viaja sin el secreto, el cliente lo pide al instalar, y quien publica no es quien concede. Sin esto el flujo acaba en un correo a ciegas.",
+          "properties": {
+            "team": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$",
+              "description": "Slug del equipo custodio, nunca una persona."
+            },
+            "access_request_url": {
+              "type": "string",
+              "format": "uri",
+              "description": "Dónde se solicita el acceso."
+            }
+          }
+        },
+        "tools_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "sha256 del contrato aprobado del servidor: nombres, descripciones y esquemas de entrada de sus herramientas, normalizados. Lo propone el asistente de autoría consultando al servidor; rules y check-mcp-drift lo comparan con lo que el servidor expone (C4). Un cambio externo del servidor suspende la unidad."
+        }
+      },
+      "if": {
+        "properties": { "credentials": { "minItems": 1 } }
+      },
+      "then": {
+        "required": ["credentials_owner"]
+      }
+    }
+  }
+}

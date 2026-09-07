@@ -1,0 +1,5 @@
+# Los esquemas y las plantillas se copian byte a byte del paquete de diseño y se comparan con él.
+# Sin esto, la conversión automática de finales de línea en Windows haría que un clon nuevo ya no
+# coincidiera con el origen aunque el contenido fuera el mismo.
+schemas/** text eol=lf
+templates/** text eol=lf

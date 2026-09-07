@@ -7,7 +7,7 @@ prompts, agentes, configuraciones MCP, hooks) y los controles que lo hacen exigi
 
 | Carpeta | Qué es |
 |---|---|
-| `schemas/` | El contrato de cada tipo de artefacto y de `GOVERNANCE.json` |
+| `schemas/` | Los dos contratos que el estándar sí mantiene: `GOVERNANCE.json` y el índice del marketplace. No hay copias de formatos de cliente |
 | `port/` | La estructura de la ficha del catálogo de metadata |
 | `.github/actions/` | Los controles reutilizables: `rules`, `evals`, `collision`, `seal`, `smoke-test` |
 | `.github/workflows/` | Los workflows reutilizables (`register`, `verify`, `tag`, `publish`) y los relojes |
