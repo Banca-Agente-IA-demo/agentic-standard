@@ -1,0 +1,55 @@
+# Registro: aplica las reglas del estándar a las unidades que un push toca en una rama de trabajo.
+#
+# Es el flujo 1. Sólo comprueba: no escribe en el repositorio, no etiqueta, no abre incidencias y no
+# habla con el catálogo. Por eso NO necesita la App del ciclo de vida y le basta la credencial por
+# defecto del llamador.
+#
+# FIRMA PARA QUIEN LO INVOCA:
+#
+#   permiso           job     por qué
+#   contents: read    rules   clonar el repositorio del dominio y leer su historial
+#
+# El llamador debe conceder exactamente eso. Si concede menos, la ejecución muere en el arranque sin
+# mensaje útil; los permisos del llamado sólo se pueden mantener o reducir, nunca elevar.
+#
+# La comprobación aparece como `<id del job del llamador> / rules`. Con el llamador del estándar es
+# `register / rules`, y ese texto es contrato: renombrar el job del llamador cambia el nombre de la
+# comprobación.
+name: register
+
+on:
+  workflow_call:
+    inputs:
+      changed-since:
+        description: Referencia con la que comparar para descubrir las unidades tocadas.
+        required: false
+        type: string
+        default: origin/main
+      python-version:
+        description: Versión de Python del runner.
+        required: false
+        type: string
+        default: "3.11"
+
+permissions: {}
+
+jobs:
+  rules:
+    name: rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout del repositorio de dominio con su historial
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # El historial completo hace falta para comparar con el ancestro común de la rama base.
+          fetch-depth: 0
+
+      - name: Aplicar las reglas del estándar a las unidades tocadas
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/validate@v1
+        with:
+          path: .
+          changed-since: ${{ inputs.changed-since }}
+          python-version: ${{ inputs.python-version }}

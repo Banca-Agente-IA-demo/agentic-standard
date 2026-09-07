@@ -86,7 +86,8 @@ def test_el_formato_estructurado_lleva_el_veredicto_en_un_campo(tmp_path, capsys
     root = build_unit(tmp_path)
     main([str(root), "--format", "json"])
     payload = json.loads(capsys.readouterr().out)
-    assert payload["verdict"] == "compliant" and payload["findings"] == []
+    assert payload["verdict"] == "compliant"
+    assert payload["units_checked"] == 1 and payload["units"][0]["findings"] == []
 
 
 def test_una_credencial_en_claro_en_una_unidad_real_se_detecta(tmp_path):

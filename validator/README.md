@@ -17,9 +17,16 @@ del autor y la automatización usen exactamente la misma. No es autocontenido; n
 
 ```
 rules <carpeta-de-la-unidad>
-rules <carpeta-de-la-unidad> --format json     # para el asistente
-rules <carpeta-de-la-unidad> --verbose         # detalle de lo que lee
+rules <raiz-del-repositorio> --changed-since origin/main   # sólo lo que el trabajo ha tocado
+rules <ruta> --format json                                 # para el asistente
+rules <ruta> --verbose                                     # detalle de lo que lee
 ```
+
+Con `--changed-since` la ruta es la raíz del repositorio y se comprueban sólo las unidades que el
+trabajo actual ha tocado respecto a esa referencia. Es lo que ejecuta el registro en cada push a una
+rama de trabajo. La comparación es con el ancestro común, así que lo que avance en la rama base
+mientras el autor trabaja no se le atribuye. Si no hay con qué comparar, por ejemplo en el primer push
+de una rama, se comprueban todas las unidades: comprobar de más es molesto, callar es peligroso.
 
 La carpeta de la unidad es la que contiene `GOVERNANCE.json`. El repositorio que la aloja se deduce
 del árbol; `--repository` lo fuerza cuando la unidad no está en su sitio habitual.

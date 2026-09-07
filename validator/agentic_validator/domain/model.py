@@ -165,6 +165,34 @@ class Report:
         return Verdict.NOT_COMPLIANT if self.errors else Verdict.COMPLIANT
 
 
+@dataclass(frozen=True)
+class RunReport:
+    """El resultado de una ejecución, que puede abarcar varias unidades.
+
+    Una sola unidad es el caso de un elemento. `unavailable` es para cuando no se pudo llegar a
+    comprobar nada, que no es lo mismo que comprobar y no encontrar hallazgos.
+    """
+
+    scope: str
+    """Qué se comprobó: la unidad, o el repositorio cuando se descubrieron las unidades tocadas."""
+    reports: tuple[Report, ...] = ()
+    unavailable: str | None = None
+
+    @property
+    def verdict(self) -> Verdict:
+        if self.unavailable is not None:
+            return Verdict.UNREADABLE
+        return Verdict.NOT_COMPLIANT if any(report.errors for report in self.reports) else Verdict.COMPLIANT
+
+    @property
+    def error_count(self) -> int:
+        return sum(len(report.errors) for report in self.reports)
+
+    @property
+    def warning_count(self) -> int:
+        return sum(len(report.warnings) for report in self.reports)
+
+
 # --- Riesgo ----------------------------------------------------------------------------------------
 
 
