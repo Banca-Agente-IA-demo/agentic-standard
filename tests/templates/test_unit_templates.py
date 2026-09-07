@@ -12,7 +12,7 @@ import re
 import pytest
 
 from tests.support import errors_of
-from tests.templates.markers import STRUCTURED_TEMPLATES, instantiate, read_template
+from tests.templates.markers import MissingMarkerValue, STRUCTURED_TEMPLATES, instantiate, read_template
 
 UNIT_TEMPLATES = ("plugin-unit", "individual-unit")
 
@@ -106,7 +106,5 @@ def test_la_plantilla_de_servidor_referencia_la_credencial_por_nombre_y_no_por_v
 
 
 def test_una_plantilla_con_un_marcador_desconocido_falla_al_instanciarse():
-    from tests.templates.markers import MissingMarkerValue
-
     with pytest.raises(MissingMarkerValue, match="INVENTADO"):
         instantiate('{"campo": "<<INVENTADO>>"}')

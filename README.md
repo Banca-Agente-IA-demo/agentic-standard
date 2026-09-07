@@ -11,7 +11,7 @@ prompts, agentes, configuraciones MCP, hooks) y los controles que lo hacen exigi
 | `port/` | La estructura de la ficha del catálogo de metadata |
 | `.github/actions/` | Los controles reutilizables: `rules`, `evals`, `collision`, `seal`, `smoke-test` |
 | `.github/workflows/` | Los workflows reutilizables (`register`, `verify`, `tag`, `publish`) y los relojes |
-| `validator/` | Los controles de publicación, con sus pruebas |
+| `validator/` | Las reglas de la unidad, como paquete instalable con el comando `rules`; el contrato de gobierno viaja dentro |
 | `index/` | Generación del índice de los marketplaces |
 | `evals/` | Conexión del motor de evaluación con el asistente |
 | `templates/` | El punto de partida de una unidad, agrupada o individual, y de cada tipo de artefacto. Los huecos se marcan con `<<NOMBRE>>` |
@@ -33,7 +33,9 @@ Herramientas y pruebas:
 
 ```
 python -m pip install -e ".[dev]"
+pip install -e ./validator
 smoke-org --env demo        # prueba de humo de la organización; 0 pasa, 1 no pasa, 2 sin datos
+rules <unidad>              # reglas del estándar; 0 cumple, 1 no cumple, 2 no comprobable
 pytest -q
 ```
 

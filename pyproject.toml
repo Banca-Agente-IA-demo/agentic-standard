@@ -13,7 +13,7 @@ dependencies = []
 [project.optional-dependencies]
 # jsonschema valida los contratos de schemas/ en las pruebas. Es dependencia de DESARROLLO: los
 # esquemas son datos y el paquete del validador declarará la suya de ejecución en std-003.
-dev = ["pytest>=8", "jsonschema>=4.20", "pyyaml>=6"]
+dev = ["pytest>=8", "jsonschema>=4.20", "pyyaml>=6", "hatchling>=1.21"]
 
 [project.scripts]
 smoke-org = "smoke_org.__main__:main"
@@ -26,3 +26,4 @@ smoke_org = ["environments/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: construye la distribución del validador; tarda unos segundos"]
