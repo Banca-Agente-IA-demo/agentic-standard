@@ -13,6 +13,7 @@ on:
       - "tests/**"
       - "schemas/**"
       - "templates/**"
+      - "validator/**"
       - "config/teams.json"
       - "pyproject.toml"
       - ".github/workflows/tests.yml"
@@ -39,6 +40,9 @@ jobs:
 
       - name: Instalar las herramientas en modo editable con pytest
         run: python -m pip install -e ".[dev]"
+
+      - name: Instalar el validador en modo editable
+        run: python -m pip install -e ./validator
 
       - name: Ejecutar las pruebas de smoke_org
         run: python -m pytest -q
