@@ -37,6 +37,17 @@ CLIENT_VARIABLES = frozenset(
 )
 PLUGIN_ROOT_PREFIX = "${CLAUDE_PLUGIN_ROOT}/"
 
+# Tope de tiempo de un hook, en segundos. El lineamiento 04 §2 exige que exista un techo pero todavía
+# no fija el número; éste es el del estándar hasta que lo haga. Un hook que tarde más cuelga la sesión
+# de quien lo instaló sin que pueda saber por qué.
+MAX_HOOK_TIMEOUT_SECONDS = 60
+
+# Límite de la descripción que fija la especificación de skills. Es lo único que se carga en CADA
+# petición, así que pasarse degrada la selección de todos los artefactos instalados.
+MAX_DESCRIPTION_LENGTH = 1024
+
+HOOK_TESTS_DIR = "hooks/tests"
+
 DETERMINISTIC_ASSERT_TYPES = frozenset(
     {"contains", "icontains", "not-contains", "regex", "is-json", "javascript"}
 )
@@ -173,8 +184,10 @@ class UnitSnapshot:
     hooks: dict | None = None
     hooks_error: str | None = None
     eval_suites: tuple[EvalSuite, ...] = ()
-    extra_files: tuple[str, ...] = field(default_factory=tuple)
-    """Rutas relativas de otros archivos de la unidad, para las reglas que sólo miran presencia."""
+    files: tuple[str, ...] = field(default_factory=tuple)
+    """Todas las rutas relativas de la unidad, para las reglas de layout y de presencia."""
+    text_contents: dict[str, str] = field(default_factory=dict)
+    """Contenido de los archivos de texto de la unidad, para las reglas de higiene. Nadie lo muta."""
 
     @property
     def text_artifacts(self) -> tuple[TextArtifact, ...]:

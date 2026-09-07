@@ -67,3 +67,10 @@ def test_una_identidad_sin_version_es_error():
 def test_un_campo_fuera_del_formato_de_identidad_es_error():
     snap = snapshot(manifest={"name": UNIT_NAME, "version": "0.1.0", "dependencies": ["otra-unidad"]})
     assert "identity.manifest-unknown-fields" in _rules(snap)
+
+
+def test_una_identidad_sin_schema_es_error():
+    # El $schema del manifiesto sí es público y resuelve desde el editor, al contrario que el del
+    # gobierno, que por eso lleva schema_version (D5).
+    snap = snapshot(manifest={"name": UNIT_NAME, "version": "0.1.0"})
+    assert "identity.manifest-schema-missing" in _rules(snap)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agentic_validator.domain.model import Severity
+from agentic_validator.domain.model import MAX_HOOK_TIMEOUT_SECONDS, Severity
 from agentic_validator.domain.rules import hooks
 
 from tests.validator.units import hooks_config, snapshot
@@ -77,3 +77,16 @@ def test_un_evento_fuera_de_la_lista_portable_avisa_pero_no_bloquea():
 
 def test_unos_hooks_ilegibles_se_informan_como_hallazgo():
     assert "hooks.unreadable" in _rules(snapshot(hooks_error="JSON inválido: línea 4"))
+
+
+def test_un_tope_de_tiempo_por_encima_del_techo_es_error():
+    # 04 §2 exige que exista un techo; el del estándar es el de la constante del validador.
+    config = hooks_config()
+    config["hooks"]["PostToolUse"][0]["hooks"][0]["timeout"] = MAX_HOOK_TIMEOUT_SECONDS + 1
+    assert "hooks.timeout-above-ceiling" in _rules(snapshot(hooks=config))
+
+
+def test_un_tope_de_tiempo_en_el_techo_exacto_no_es_error():
+    config = hooks_config()
+    config["hooks"]["PostToolUse"][0]["hooks"][0]["timeout"] = MAX_HOOK_TIMEOUT_SECONDS
+    assert "hooks.timeout-above-ceiling" not in _rules(snapshot(hooks=config))

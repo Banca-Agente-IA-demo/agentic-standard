@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from agentic_validator.domain.model import (
     DETERMINISTIC_ASSERT_TYPES,
+    EVALS_DIR,
     GOVERNANCE_FILE,
+    MAX_DESCRIPTION_LENGTH,
     MIN_EVAL_CASES,
     REQUIRED_EVAL_CATEGORIES,
     Finding,
@@ -70,8 +72,18 @@ def check_artifact_descriptions(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
         front = artifact.frontmatter
         if front is None:
             continue
-        if not str(front.get("description") or "").strip():
+        description = str(front.get("description") or "").strip()
+        if not description:
             findings.append(error("artifact.description-missing", artifact.path, "el frontmatter no declara descripción"))
+        elif len(description) > MAX_DESCRIPTION_LENGTH:
+            # Es lo único que se carga en CADA petición: pasarse degrada la selección de todo lo instalado.
+            findings.append(
+                error(
+                    "artifact.description-too-long",
+                    artifact.path,
+                    f"la descripción tiene {len(description)} caracteres y el máximo del formato es {MAX_DESCRIPTION_LENGTH}",
+                )
+            )
     return tuple(findings)
 
 
@@ -134,6 +146,16 @@ def check_agent_mcp_spellings(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
         has_copilot = any(name.endswith(COPILOT_MCP_TOOL_SUFFIX) and not name.startswith("mcp__") for name in names)
         if not has_claude and not has_copilot:
             continue
+        own_unit_marker = f"{CLAUDE_MCP_TOOL_PREFIX}{snapshot.name}_"
+        foreign = [n for n in names if n.startswith(CLAUDE_MCP_TOOL_PREFIX) and not n.startswith(own_unit_marker)]
+        if foreign:
+            findings.append(
+                error(
+                    "artifact.agent-mcp-of-another-unit",
+                    agent.path,
+                    f"{foreign[0]!r} apunta al servidor de otra unidad; el servidor viaja en la misma unidad que el agente",
+                )
+            )
         if not has_claude:
             findings.append(
                 error(
@@ -220,5 +242,25 @@ def _check_suite_cases(path: str, tests: list) -> list[Finding]:
     return findings
 
 
-def _artifact_kind(artifact: TextArtifact) -> str:
-    return artifact.path.split("/", 1)[0]
+def check_every_artifact_has_its_suite(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
+    """Skill, agente y prompt necesitan suite para publicar (02 §8.2).
+
+    Avisa en vez de bloquear: estas reglas corren también en el push, cuando el autor todavía está
+    trabajando y la suite puede no existir. El bloqueo es de la verificación de la solicitud de cambio.
+    """
+    if not snapshot.text_artifacts:
+        return ()
+    suite_paths = {suite.path for suite in snapshot.eval_suites}
+    findings: list[Finding] = []
+    for artifact in snapshot.text_artifacts:
+        name = artifact.expected_name
+        expected = (f"{EVALS_DIR}/{name}/promptfooconfig.yaml", f"{EVALS_DIR}/promptfooconfig.yaml")
+        if not any(path in suite_paths for path in expected):
+            findings.append(
+                warning(
+                    "evals.suite-missing",
+                    artifact.path,
+                    f"no tiene suite en {expected[0]}; sin ella no se llega a Experimental",
+                )
+            )
+    return tuple(findings)

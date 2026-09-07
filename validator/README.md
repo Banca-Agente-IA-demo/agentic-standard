@@ -35,12 +35,13 @@ del árbol; `--repository` lo fuerza cuando la unidad no está en su sitio habit
 | Grupo | Reglas |
 |---|---|
 | Contrato | El archivo de gobierno valida contra `governance.schema.json` |
-| Identidad | Gobierno e identidad presentes; el identificador empieza por el repositorio y termina en el nombre de la unidad; ese nombre es el del manifiesto y el del directorio; versión SemVer estricta; ningún campo fuera del formato de identidad |
+| Identidad | Gobierno e identidad presentes; el identificador empieza por el repositorio y termina en el nombre de la unidad; ese nombre es el del manifiesto y el del directorio; versión SemVer estricta; referencia de esquema declarada; ningún campo fuera del formato de identidad |
 | Permisos (C1) | Las herramientas de cada agente, los ejecutables de cada hook y el servidor de la conexión están declarados en `permissions` |
 | Servidor MCP (D2, C2) | Como mucho un servidor; la misma clave en conexión, gobierno y permisos; el bloque de gobierno existe si y sólo si hay conexión; credenciales cotejadas en los dos sentidos; ningún valor literal con pinta de secreto |
-| Hooks (D3, C5) | Tope de tiempo en cada acción y con el nombre correcto; comando dentro de la unidad; sin descarga en ejecución; eventos portables (aviso) |
-| Artefactos (D1, D7, C3) | Nombre declarado igual al que impone la ruta; descripción no vacía; ningún campo de gobierno en el frontmatter; mapa de catálogo texto a texto; las dos grafías del agente que restringe servidor; tratamiento de contenido externo según el tipo |
-| Evaluación (D4) | Si la unidad trae suite: mínimo de casos, las tres categorías, y una aserción mecánica por caso |
+| Hooks (D3, C5) | Tope de tiempo en cada acción, con el nombre correcto y bajo el techo del estándar; comando dentro de la unidad; sin descarga en ejecución; pruebas en `hooks/tests/`; eventos portables (aviso) |
+| Artefactos (D1, D7, C3) | Nombre declarado igual al que impone la ruta; descripción no vacía y dentro del máximo del formato; ningún campo de gobierno en el frontmatter; mapa de catálogo texto a texto; las dos grafías del agente que restringe servidor, con el nombre de su propia unidad; tratamiento de contenido externo según el tipo |
+| Evaluación (D4) | Cada artefacto de texto trae su suite (aviso si falta); en la que trae: mínimo de casos, las tres categorías, y una aserción mecánica por caso |
+| Layout e higiene (04 §4, C2) | Cada artefacto en su carpeta; sin unidades anidadas; sin rutas absolutas en archivos ejecutables o de configuración |
 | Riesgo (03 §1) | El nivel declarado nunca por debajo del mínimo calculado de hechos |
 
 ## Qué no comprueba, a propósito
@@ -51,7 +52,12 @@ del árbol; `--repository` lo fuerza cuando la unidad no está en su sitio habit
   explícita del autor.
 - **La estructura interna de cada tipo**: la fija la herramienta, no el estándar. El validador lee de
   cada formato de cliente sólo lo enumerado arriba.
-- **La ausencia de suite**: se exige para publicar, no para registrar.
+- **Que el equipo dueño exista en la organización**: exige una sesión autenticada. Es del job de
+  reglas de la verificación.
+- **Que el contrato declarado del servidor corresponda con lo que el servidor expone**: exige
+  arrancarlo. Es del asistente al proponer el contrato, y del reloj que vigila el cambio externo.
+
+La **ausencia de suite** sí se señala, pero como aviso: se exige para publicar, no para registrar.
 
 ## Cómo viaja el contrato de gobierno
 

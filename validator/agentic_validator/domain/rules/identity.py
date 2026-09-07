@@ -114,6 +114,12 @@ def check_manifest_fields(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
                 f"campos fuera del formato de identidad: {', '.join(unknown)}",
             ),
         )
+    findings: list[Finding] = []
     if not manifest.get("name"):
-        return (error("identity.manifest-name-missing", MANIFEST_FILE, "la identidad no declara nombre"),)
-    return ()
+        findings.append(error("identity.manifest-name-missing", MANIFEST_FILE, "la identidad no declara nombre"))
+    if not manifest.get("$schema"):
+        # Es público y sí resuelve desde el editor, al contrario que el del gobierno (D5).
+        findings.append(
+            error("identity.manifest-schema-missing", MANIFEST_FILE, "la identidad no declara $schema")
+        )
+    return tuple(findings)

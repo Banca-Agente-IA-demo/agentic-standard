@@ -21,6 +21,34 @@ UNIT_NAME = "demo-unit"
 REPOSITORY = "agents-demo"
 SERVER = "jira"
 CREDENTIAL = "JIRA_TOKEN"
+HOOK_SCRIPT = "#!/bin/sh\nexit 0\n"
+
+EVAL_SUITE = """description: suite de {name}
+prompts:
+  - "{{{{query}}}}"
+tests:
+  - description: camino esperado
+    metadata:
+      category: happy_path
+    vars: {{query: "algo"}}
+    assert:
+      - type: icontains
+        value: algo
+  - description: borde
+    metadata:
+      category: edge_case
+    vars: {{query: "algo raro"}}
+    assert:
+      - type: icontains
+        value: algo
+  - description: se abstiene
+    metadata:
+      category: negative
+    vars: {{query: "otra cosa"}}
+    assert:
+      - type: not-contains
+        value: algo
+"""
 
 
 def build_unit(base: Path, *, with_mcp: bool = False, with_hooks: bool = False) -> Path:
@@ -38,12 +66,16 @@ def build_unit(base: Path, *, with_mcp: bool = False, with_hooks: bool = False) 
         (root / ".mcp.json").write_text(instantiate(read_template("artifacts/mcp/.mcp.json")), encoding="utf-8")
     if with_hooks:
         governance["permissions"] = {**governance["permissions"], "commands": ["check.sh"]}
-        (root / "hooks").mkdir()
+        (root / "hooks" / "scripts").mkdir(parents=True)
+        (root / "hooks" / "tests").mkdir(parents=True)
         hooks = json.loads(read_template("artifacts/hooks/hooks.json"))
         action = hooks["hooks"]["PostToolUse"][0]["hooks"][0]
         action["command"] = "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check.sh"
         hooks["hooks"]["PostToolUse"][0]["matcher"] = "Edit"
         (root / "hooks" / "hooks.json").write_text(json.dumps(hooks, indent=2), encoding="utf-8")
+        (root / "hooks" / "scripts" / "check.sh").write_text(HOOK_SCRIPT, encoding="utf-8")
+        # C5: los hooks traen pruebas que ejercitan el script con entrada y salida observables.
+        (root / "hooks" / "tests" / "test_check.sh").write_text(HOOK_SCRIPT, encoding="utf-8")
     write_governance(root, governance)
     return root
 
@@ -56,8 +88,17 @@ def read_governance(root: Path) -> dict:
     return json.loads((root / "GOVERNANCE.json").read_text(encoding="utf-8"))
 
 
-def add_skill(root: Path, name: str = "demo-skill") -> Path:
-    """Añade un skill válido y devuelve la ruta de su archivo."""
+def add_eval_suite(root: Path, name: str) -> Path:
+    """La suite mínima que el estándar exige: tres casos, las tres categorías, ancla mecánica."""
+    directory = root / "evals" / name
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "promptfooconfig.yaml"
+    path.write_text(EVAL_SUITE.format(name=name), encoding="utf-8")
+    return path
+
+
+def add_skill(root: Path, name: str = "demo-skill", *, with_suite: bool = True) -> Path:
+    """Añade un skill válido con su suite y devuelve la ruta de su archivo."""
     directory = root / "skills" / name
     directory.mkdir(parents=True)
     path = directory / "SKILL.md"
@@ -65,10 +106,12 @@ def add_skill(root: Path, name: str = "demo-skill") -> Path:
         f"---\nname: {name}\ndescription: Revisa algo concreto. Úsalo cuando alguien lo pida.\n---\n\n# Título\n",
         encoding="utf-8",
     )
+    if with_suite:
+        add_eval_suite(root, name)
     return path
 
 
-def add_agent(root: Path, name: str = "demo-agent", *, tools: list[str] | None = None) -> Path:
+def add_agent(root: Path, name: str = "demo-agent", *, tools: list[str] | None = None, with_suite: bool = True) -> Path:
     directory = root / "agents"
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{name}.agent.md"
@@ -78,6 +121,8 @@ def add_agent(root: Path, name: str = "demo-agent", *, tools: list[str] | None =
         f"---\nname: {name}\ndescription: Hace algo concreto.\ntools:\n{lines}\n---\n\n# Título\n",
         encoding="utf-8",
     )
+    if with_suite:
+        add_eval_suite(root, name)
     return path
 
 

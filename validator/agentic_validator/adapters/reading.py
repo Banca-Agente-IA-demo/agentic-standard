@@ -144,6 +144,35 @@ def read_unit(root: Path, repository: str | None = None) -> UnitSnapshot:
         hooks=hooks.data,
         hooks_error=hooks.error,
         eval_suites=_eval_suites(root),
+        files=_files(root),
+        text_contents=_text_contents(root),
+    )
+
+
+# Sufijos cuyo contenido leen las reglas de higiene. Un binario ni se abre.
+_SCANNED_SUFFIXES = (".md", ".json", ".yaml", ".yml", ".sh", ".ps1", ".py", ".bat", ".txt")
+# Tope de tamaño por archivo: un artefacto de texto no llega ni de lejos, y evita cargar un volcado.
+_MAX_SCANNED_BYTES = 512_000
+
+
+def _text_contents(root: Path) -> dict[str, str]:
+    contents: dict[str, str] = {}
+    for path in root.rglob("*"):
+        if not path.is_file() or not path.name.endswith(_SCANNED_SUFFIXES):
+            continue
+        if path.stat().st_size > _MAX_SCANNED_BYTES:
+            log.debug("%s supera el tope de lectura para higiene", path.name)
+            continue
+        read = _read_text(path)
+        if read.data is not None:
+            contents[path.relative_to(root).as_posix()] = read.data["text"]
+    return contents
+
+
+def _files(root: Path) -> tuple[str, ...]:
+    """Todas las rutas relativas de la unidad, para las reglas de layout, higiene y presencia."""
+    return tuple(
+        sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
     )
 
 

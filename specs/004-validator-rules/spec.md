@@ -10,8 +10,13 @@
 
 **Depende de**: las specs 002 (esquemas) y 003 (plantillas), ya fusionadas.
 
-**Input**: `REVISION-ESQUEMAS-HITO-1.md` §5 (qué se lee de cada formato sin esquema propio) y las
-decisiones D1 a D7; lineamiento 03 §1 (cálculo de riesgo) y §3 (matriz de controles por tipo).
+**Input**: `REVISION-ESQUEMAS-HITO-1.md` §7.1 (tabla completa de reglas de la unidad, con el origen de
+cada una) y §5 (qué se lee de cada formato sin esquema propio); decisiones D1 a D7; lineamiento 03 §1
+(cálculo de riesgo) y §3 (matriz de controles por tipo); 04 §4 (árbol de la unidad).
+
+**Revisado el 2026-09-07**: la primera redacción salió de §5, que es un subconjunto. La sección 7.1
+apareció después con la tabla completa y se cotejó regla a regla. Lo que faltaba se añadió; lo que no
+se puede hacer sin salir del árbol se documenta abajo.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -225,6 +230,18 @@ mismo del repositorio; instalarlo en un entorno limpio y ejecutar el comando.
   coincide con el de su archivo o directorio y que su descripción no está vacía.
 - **FR-018**: El validador MUST NOT juzgar nada del contenido de los formatos de cliente más allá de
   lo enumerado: la estructura interna de cada tipo la fija la herramienta.
+- **FR-020**: El validador MUST comprobar que la descripción de un artefacto no supera el máximo del
+  formato, porque es lo único que se carga en cada petición.
+- **FR-021**: El validador MUST exigir que el tope de tiempo de cada hook esté por debajo del techo
+  del estándar, y que los hooks traigan pruebas que los ejerciten.
+- **FR-022**: El validador MUST comprobar que un agente que restringe su servidor lo nombra con el de
+  su propia unidad, no con el de otra.
+- **FR-023**: El validador MUST avisar cuando un artefacto de texto no trae su suite, sin bloquear,
+  porque estas reglas corren también en el push.
+- **FR-024**: El validador MUST comprobar el layout de la unidad: cada artefacto en su carpeta, sin
+  unidades anidadas, y sin rutas absolutas en los archivos ejecutables o de configuración.
+- **FR-025**: El archivo de identidad MUST declarar su referencia de esquema, que es pública y sí
+  resuelve desde el editor.
 - **FR-019**: Las reglas MUST ser comprobables con datos, sin leer disco ni red, y el paquete MUST
   tener pruebas de cada una en CI.
 
@@ -273,3 +290,24 @@ mismo del repositorio; instalarlo en un entorno limpio y ejecutar el comando.
   incluye en el momento de construirse desde el único archivo del repositorio. No se copia al árbol.
 - Q: ¿Un evento de hook fuera de la lista portable bloquea? → A: avisa. La lista se fija en el
   lineamiento 04 §2 y hasta entonces bloquear sería exigir lo que la norma todavía no dice.
+
+### Session 2026-09-07, tras cotejar con la sección 7.1
+
+- Q: ¿La ausencia de suite es un hallazgo? → A: **sí, como aviso**, revisando la respuesta anterior.
+  La tabla 7.1 la lista como regla de la unidad. Avisa en vez de bloquear porque estas reglas corren
+  también en el push, cuando el autor todavía está trabajando; el bloqueo es de la verificación de la
+  solicitud de cambio (02 §8.2).
+- Q: ¿Cuál es el techo del tope de tiempo de un hook? → A: el lineamiento 04 §2 exige que exista un
+  techo pero no fija el número. Se declara como constante nombrada del validador, con el motivo
+  escrito al lado, y se confirma cuando 04 §2 lo fije.
+
+## Fuera de alcance, con motivo
+
+Dos reglas de la tabla 7.1 no entran en esta capacidad porque no se pueden comprobar sobre el árbol:
+
+| Regla | Por qué no entra | Dónde debe vivir |
+|---|---|---|
+| El equipo dueño existe en la organización | Exige preguntar a GitHub con una sesión autenticada. Meterlo aquí haría que las reglas dejaran de probarse con datos y que el validador fallara sin red | El job de reglas de la verificación, que sí tiene sesión |
+| El contrato declarado del servidor corresponde con lo que el servidor expone | Exige arrancar el servidor, y el estándar sólo lo hace tras confirmación explícita del autor | El asistente de autoría al proponer el contrato, y el reloj que vigila el cambio externo |
+
+Las dos quedan anotadas para que nadie las dé por hechas al leer la tabla.

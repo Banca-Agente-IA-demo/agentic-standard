@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from agentic_validator.domain.model import (
     HOOKS_FILE,
+    MAX_HOOK_TIMEOUT_SECONDS,
     PLUGIN_ROOT_PREFIX,
     PORTABLE_HOOK_EVENTS,
     Finding,
@@ -76,9 +77,18 @@ def check_hook_timeouts(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
                     f"el hook de {event} usa {INVENTED_TIMEOUT_FIELD!r}, que no existe en el formato; el campo es 'timeout'",
                 )
             )
-        if "timeout" not in action:
+        timeout = action.get("timeout")
+        if timeout is None:
             findings.append(
                 error("hooks.timeout-missing", HOOKS_FILE, f"el hook de {event} no declara tope de tiempo")
+            )
+        elif isinstance(timeout, (int, float)) and timeout > MAX_HOOK_TIMEOUT_SECONDS:
+            findings.append(
+                error(
+                    "hooks.timeout-above-ceiling",
+                    HOOKS_FILE,
+                    f"el hook de {event} declara {timeout} s y el techo del estándar es {MAX_HOOK_TIMEOUT_SECONDS}",
+                )
             )
     return tuple(findings)
 
