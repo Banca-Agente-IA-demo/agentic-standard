@@ -25,12 +25,6 @@ on:
         required: false
         type: string
         default: origin/main
-      python-version:
-        description: Versión de Python del runner.
-        required: false
-        type: string
-        default: "3.11"
-
 permissions: {}
 
 jobs:
@@ -52,4 +46,3 @@ jobs:
         with:
           path: .
           changed-since: ${{ inputs.changed-since }}
-          python-version: ${{ inputs.python-version }}

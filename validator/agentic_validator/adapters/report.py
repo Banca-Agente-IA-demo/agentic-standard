@@ -21,6 +21,11 @@ _VERDICT_LABELS = {
 NOTHING_TO_CHECK = "Ninguna unidad tocada: no había nada que comprobar."
 
 
+def _plural(count: int, singular: str, plural: str) -> str:
+    """El informe lo lee una persona, y «1 unidades» delata que nadie lo miró."""
+    return f"{count} {singular if count == 1 else plural}"
+
+
 def _unit_lines(report: Report) -> list[str]:
     lines = [f"Unidad {report.unit}"]
     lines.extend(
@@ -43,8 +48,9 @@ def render_text(run: RunReport) -> str:
             lines.extend(_unit_lines(report))
             lines.append("")
         lines.append(
-            f"Resumen: {len(run.reports)} unidades comprobadas, "
-            f"{run.error_count} errores, {run.warning_count} avisos"
+            f"Resumen: {_plural(len(run.reports), 'unidad comprobada', 'unidades comprobadas')}, "
+            f"{_plural(run.error_count, 'error', 'errores')}, "
+            f"{_plural(run.warning_count, 'aviso', 'avisos')}"
         )
     lines.append(f"Veredicto: {_VERDICT_LABELS[run.verdict]}")
     return "\n".join(lines)
