@@ -1,0 +1,13 @@
+{
+  "$comment": "Valores esperados de la organización de demostración (plan gratuito, repos públicos). Guía de configuración §1, §5 y §11.",
+  "organization": "Banca-Agente-IA-demo",
+  "plan": "free",
+  "default_repository_permission": "read",
+  "members_can_create_repositories": false,
+  "platform_repositories": ["agentic-standard"],
+  "marketplaces": [
+    { "repository": "agentic-marketplace", "channel": "production" },
+    { "repository": "agentic-marketplace-exp", "channel": "experimental" }
+  ],
+  "domain_repositories": ["agents-modernization"]
+}
