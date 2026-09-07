@@ -1,0 +1,79 @@
+# Instala el validador del estándar y aplica las reglas de la unidad.
+#
+# ES UNA COMPOSITE ACTION Y NO UN PASO DEL REUTILIZABLE POR UN MOTIVO MEDIDO: la credencial por defecto
+# de un workflow está acotada al repositorio del llamador y no puede clonar el estándar cuando es
+# privado, que es el caso de BCP. Una composite action se resuelve por la política de acceso de la
+# organización y llega con el árbol del estándar dentro, así que el validador se instala DESDE ESE
+# ÁRBOL y no de la red: nadie teclea una versión y la del validador no puede separarse de la del
+# workflow que lo invoca.
+name: validate
+description: Aplica las reglas del estándar agéntico a una unidad publicable o a las que un cambio toca.
+
+inputs:
+  path:
+    description: Carpeta de la unidad, o raíz del repositorio si se indica changed-since.
+    required: false
+    default: "."
+  changed-since:
+    description: >-
+      Referencia con la que comparar para descubrir las unidades tocadas, por ejemplo origin/main.
+      Vacío comprueba la unidad indicada en path.
+    required: false
+    default: ""
+  python-version:
+    description: Versión de Python. Por defecto la mínima que el estándar declara, no la de desarrollo.
+    required: false
+    default: "3.11"
+
+runs:
+  using: composite
+  steps:
+    - name: Instalar Python ${{ inputs.python-version }}
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Instalar el validador desde el árbol del estándar que trae esta action
+      shell: bash
+      run: |
+        set -euo pipefail
+        python -m pip install --quiet "${{ github.action_path }}/../../../validator"
+        echo "validador instalado desde $(cd "${{ github.action_path }}/../../.." && pwd)"
+
+    - name: Comprobar que el comando existe antes de fiarse de su resultado
+      shell: bash
+      run: |
+        set -euo pipefail
+        command -v rules >/dev/null || { echo "::error::el comando rules no quedó instalado"; exit 1; }
+
+    - name: Aplicar las reglas del estándar
+      id: apply
+      shell: bash
+      env:
+        UNIT_PATH: ${{ inputs.path }}
+        CHANGED_SINCE: ${{ inputs.changed-since }}
+      run: |
+        set -euo pipefail
+        # Se separa el código 1 (hay hallazgos) del 2 o más (el validador no pudo comprobar): los dos
+        # son rojos, pero no significan lo mismo y el autor necesita distinguirlos.
+        set +e
+        if [ -n "$CHANGED_SINCE" ]; then
+          rules "$UNIT_PATH" --changed-since "$CHANGED_SINCE" | tee "$RUNNER_TEMP/rules.txt"
+        else
+          rules "$UNIT_PATH" | tee "$RUNNER_TEMP/rules.txt"
+        fi
+        status=${PIPESTATUS[0]}
+        set -e
+        {
+          echo "### Reglas del estándar"
+          echo ''
+          echo '```'
+          cat "$RUNNER_TEMP/rules.txt"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+        case "$status" in
+          0) echo "::notice::la unidad cumple las reglas del estándar" ;;
+          1) echo "::error::hay hallazgos que impiden publicar; el informe está en el resumen" ;;
+          *) echo "::error::el validador no pudo comprobar (código $status)" ;;
+        esac
+        exit "$status"
