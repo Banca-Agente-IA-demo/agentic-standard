@@ -1,0 +1,42 @@
+# Pruebas de las herramientas del estándar en cada PR a main que las toque.
+#
+# Un evento (pull_request), un job (tests). Matriz 3.11 y 3.12: el 3.11 es el suelo declarado en
+# pyproject.toml y protege al asistente de autoría hasta medir el Python de BCP; el 3.12 es la versión
+# de desarrollo. Acciones de terceros por SHA (constitución VII). Sin secretos.
+name: tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/**"
+      - "tests/**"
+      - "config/teams.json"
+      - "pyproject.toml"
+      - ".github/workflows/tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: tests (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout del estándar
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Instalar Python ${{ matrix.python-version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Instalar las herramientas en modo editable con pytest
+        run: python -m pip install -e ".[dev]"
+
+      - name: Ejecutar las pruebas de smoke_org
+        run: python -m pytest -q

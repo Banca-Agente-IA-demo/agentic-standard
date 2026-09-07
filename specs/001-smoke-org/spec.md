@@ -67,7 +67,11 @@ y falla nombrando la diferencia.
 
 ---
 
-### User Story 3 - La misma prueba sirve para la demo y para BCP (Priority: P2)
+### User Story 3 - La misma prueba sirve para la demo y para BCP (Priority: P2, diferida)
+
+**Diferida el 2026-09-07** al hito 8 (migración a BCP): entonces se conocerán los valores reales. En
+esta spec sólo se garantiza la separación entre comprobaciones y valores esperados (FR-013), que es lo
+que hace posible la historia después. No se entrega `bcp.json`.
 
 Cuando el estándar se migre a la organización de BCP, la misma prueba de humo se ejecuta allí
 cambiando sólo los valores esperados que difieren entre entornos (nombre de la organización, plan,

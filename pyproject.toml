@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-standard-tools"
+version = "0.1.0"
+description = "Herramientas del equipo de plataforma del estándar agéntico (no se distribuyen)"
+# 3.11 es el suelo declarado por la constitución hasta medir el Python de BCP (hito A0).
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+smoke-org = "smoke_org.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["tools"]
+
+[tool.setuptools.package-data]
+smoke_org = ["environments/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

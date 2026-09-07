@@ -81,52 +81,42 @@ specs/001-smoke-org/
 
 ### Source Code (repository root)
 
+Revisado el 2026-09-07: versión reducida. La herramienta traduce diez comandos `gh` a un veredicto;
+no justifica paquetes por capa ni un puerto formal. Se conserva la separación que importa (dominio
+puro con datos, adaptador de `gh` con runner inyectable) en módulos planos.
+
 ```text
 pyproject.toml                       # paquete smoke_org bajo tools/, script smoke-org, pytest
 .github/workflows/tests.yml          # pull_request a main: pytest en 3.11 y 3.12
 
 tools/
-└── smoke_org/                       # componente; la raíz sólo tiene el entry point
+└── smoke_org/
     ├── __init__.py
-    ├── __main__.py                  # composition root: argparse, logging, cableado, exit code
-    ├── domain/
-    │   ├── __init__.py
-    │   ├── contract.py              # nombres contrato: secretos, variables, topic, App, rulesets, contextos
-    │   ├── environment.py           # Environment: valores esperados de una organización
-    │   ├── report.py                # CheckResult, CheckStatus, Report, Verdict
-    │   └── checks.py                # reglas puras: dado lo observado y lo esperado, resultados
-    ├── application/
-    │   ├── __init__.py
-    │   └── run_smoke.py             # caso de uso: recorre las comprobaciones por el puerto y agrega
-    ├── ports/
-    │   ├── __init__.py
-    │   └── github_reader.py         # Protocol GitHubReader + OrganizationSnapshot
-    ├── adapters/
-    │   ├── __init__.py
-    │   ├── gh_cli_reader.py         # implementa GitHubReader con subprocess sobre gh api
-    │   ├── environment_loader.py    # lee environments/<n>.json y config/teams.json
-    │   └── text_report.py           # renderiza Report a texto legible
+    ├── __main__.py                  # entry point: argparse, logging, cableado, exit code
+    ├── model.py                     # dominio: nombres contrato, Environment, snapshot, resultados, veredicto
+    ├── checks.py                    # dominio: las ocho comprobaciones puras y la lista CHECKS
+    ├── gh_reader.py                 # adaptador: gh en subprocess con CommandRunner inyectable
+    ├── files.py                     # adaptador: carga de environments/<n>.json y config/teams.json
+    ├── text_report.py               # adaptador: Report a texto
     └── environments/
-        ├── demo.json                # Banca-Agente-IA-demo
-        └── bcp.json                 # plantilla con los valores que BCP debe fijar
+        └── demo.json
 
 tests/
 └── smoke_org/
-    ├── domain/                      # T1: reglas con datos
-    │   ├── test_checks_*.py
-    │   └── test_report.py
-    ├── adapters/
-    │   ├── fixtures/                # respuestas reales de gh medidas el 2026-09-07
-    │   └── test_gh_cli_reader.py    # parseo de fixtures con un runner de subprocess falso inyectado
-    └── application/
-        └── test_run_smoke.py        # caso de uso con un GitHubReader falso (T4)
+    ├── fixtures/                    # respuestas reales de gh medidas el 2026-09-07, con README
+    ├── test_model.py                # veredicto y validación del entorno (T1)
+    ├── test_checks.py               # cada comprobación con datos (T1)
+    ├── test_gh_reader.py            # parseo de fixtures con runner falso (T4)
+    ├── test_files.py                # carga de JSON con tmp_path
+    └── test_text_report.py
 ```
 
 **Structure Decision**: componente único bajo `tools/`, porque el árbol del lineamiento 02 §3.4 no
-reserva sitio a herramientas de plataforma y `tools/` las agrupa sin mezclarlas con `validator/` ni
-`index/`, que son controles del ciclo de vida. Capas según la constitución IV; la raíz del componente
-sólo tiene `__main__.py`. Paquete instalable en modo editable para que `smoke-org` y `pytest`
-funcionen igual en la máquina y en CI sin tocar `PYTHONPATH`.
+reserva sitio a herramientas de plataforma. Módulos planos en vez de paquetes por capa: la constitución
+IV pide dominio puro y adaptadores sustituibles, y eso se cumple con `model.py` y `checks.py` sin
+`subprocess` ni `pathlib`, y con `gh_reader.py` recibiendo el runner por parámetro. Un puerto formal
+tendría una sola implementación real, lo que `AGENTS.md` G5 desaconseja. `bcp.json` se difiere al
+hito 8 junto con la historia 3.
 
 ## Complexity Tracking
 
