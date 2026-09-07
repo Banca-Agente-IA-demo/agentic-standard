@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from agentic_validator.domain.model import Report, RunReport, Severity, Verdict
+from agentic_validator.domain.findings import Report, RunReport, Severity, Verdict
 
 _LABELS = {Severity.ERROR: "[ERROR]", Severity.WARNING: "[AVISO]"}
 _LABEL_WIDTH = 8

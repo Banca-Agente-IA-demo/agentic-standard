@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 
-from agentic_validator.domain.model import RiskLevel
+from agentic_validator.domain.standard import RiskLevel
 from agentic_validator.domain.rules.risk import check_declared_risk_is_not_lower, minimum_risk
 
 from tests.validator.units import SERVER, hooks_config, snapshot, unit_with_mcp, with_governance

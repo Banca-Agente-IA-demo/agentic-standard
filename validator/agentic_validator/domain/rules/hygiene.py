@@ -11,16 +11,14 @@ from __future__ import annotations
 
 import re
 
-from agentic_validator.domain.model import (
+from agentic_validator.domain.findings import Finding, error, warning
+from agentic_validator.domain.snapshot import UnitSnapshot
+from agentic_validator.domain.standard import (
     CONFIGURATION_SUFFIXES,
     MIN_SECRET_DISTINCT_CHARS,
     MIN_SECRET_VALUE_LENGTH,
     SECRET_ASSIGNMENT_KEYS,
     SUPPORT_DIRECTORIES,
-    Finding,
-    UnitSnapshot,
-    error,
-    warning,
 )
 
 # Una ruta absoluta versionada apunta a la máquina de quien la escribió.

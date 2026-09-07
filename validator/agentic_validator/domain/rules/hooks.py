@@ -6,15 +6,13 @@ ninguna descarga en ejecución, y eventos que disparen en los dos clientes.
 
 from __future__ import annotations
 
-from agentic_validator.domain.model import (
+from agentic_validator.domain.findings import Finding, error, warning
+from agentic_validator.domain.snapshot import UnitSnapshot
+from agentic_validator.domain.standard import (
     HOOKS_FILE,
     MAX_HOOK_TIMEOUT_SECONDS,
     PLUGIN_ROOT_PREFIX,
     PORTABLE_HOOK_EVENTS,
-    Finding,
-    UnitSnapshot,
-    error,
-    warning,
 )
 
 # El campo que la demo anterior aceptaba «durante la migración» y que no existe en el formato. Aquí es

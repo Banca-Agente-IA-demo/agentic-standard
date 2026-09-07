@@ -13,7 +13,8 @@ from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-from agentic_validator.domain.model import GOVERNANCE_FILE, Finding, error
+from agentic_validator.domain.findings import Finding, error
+from agentic_validator.domain.standard import GOVERNANCE_FILE
 
 GOVERNANCE_SCHEMA = "governance.schema.json"
 

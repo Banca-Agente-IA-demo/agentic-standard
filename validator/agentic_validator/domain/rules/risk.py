@@ -6,14 +6,9 @@ hechos salta aprobadores obligatorios.
 
 from __future__ import annotations
 
-from agentic_validator.domain.model import (
-    GOVERNANCE_FILE,
-    SENSITIVE_CLASSIFICATIONS,
-    Finding,
-    RiskLevel,
-    UnitSnapshot,
-    error,
-)
+from agentic_validator.domain.findings import Finding, error
+from agentic_validator.domain.snapshot import UnitSnapshot
+from agentic_validator.domain.standard import GOVERNANCE_FILE, SENSITIVE_CLASSIFICATIONS, RiskLevel
 
 
 def minimum_risk(snapshot: UnitSnapshot) -> RiskLevel:

@@ -10,13 +10,9 @@ archivos, vive en `hygiene.py`.
 
 from __future__ import annotations
 
-from agentic_validator.domain.model import (
-    GOVERNANCE_FILE,
-    HOOK_TESTS_DIR,
-    Finding,
-    UnitSnapshot,
-    error,
-)
+from agentic_validator.domain.findings import Finding, error
+from agentic_validator.domain.snapshot import UnitSnapshot
+from agentic_validator.domain.standard import GOVERNANCE_FILE, HOOK_TESTS_DIR
 
 # Carpetas que el árbol de 04 §4 reserva dentro de una unidad, con la marca por la que se reconoce un
 # artefacto de ese tipo. Lo demás en la raíz es contenido de apoyo y no se juzga.

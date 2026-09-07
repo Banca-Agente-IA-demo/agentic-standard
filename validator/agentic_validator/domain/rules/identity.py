@@ -8,14 +8,9 @@ from __future__ import annotations
 
 import re
 
-from agentic_validator.domain.model import (
-    ALLOWED_MANIFEST_FIELDS,
-    GOVERNANCE_FILE,
-    MANIFEST_FILE,
-    Finding,
-    UnitSnapshot,
-    error,
-)
+from agentic_validator.domain.findings import Finding, error
+from agentic_validator.domain.snapshot import UnitSnapshot
+from agentic_validator.domain.standard import ALLOWED_MANIFEST_FIELDS, GOVERNANCE_FILE, MANIFEST_FILE
 
 # SemVer 2.0.0 con sufijo de prelanzamiento opcional y sin metadatos de compilación. La etiqueta debe
 # coincidir con esta versión y el índice la copia (02 §7.1).

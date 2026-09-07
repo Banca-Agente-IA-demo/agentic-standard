@@ -1,34 +1,20 @@
-"""Los artefactos de texto y su suite: lo poco que el estándar lee de formatos ajenos.
+"""Se hace cargo de lo que una unidad debe declarar por llevar artefactos de texto.
 
-La estructura interna de cada tipo la fija la herramienta (04 §4). Aquí sólo se comprueba lo que la
-sección 5 de la revisión enumera, más las dos reglas de portabilidad medidas en D7.
+Un skill, un agente o un prompt sólo exponen al estándar su frontmatter, y su mera presencia obliga a
+declarar cómo se trata el contenido externo (C3). La estructura interna de cada tipo la fija la
+herramienta (04 §4) y aquí no se juzga.
 """
 
 from __future__ import annotations
 
-from agentic_validator.domain.model import (
-    DETERMINISTIC_ASSERT_TYPES,
-    EVALS_DIR,
-    GOVERNANCE_FILE,
-    MAX_DESCRIPTION_LENGTH,
-    MIN_EVAL_CASES,
-    REQUIRED_EVAL_CATEGORIES,
-    Finding,
-    TextArtifact,
-    UnitSnapshot,
-    error,
-    warning,
-)
+from agentic_validator.domain.findings import Finding, error
+from agentic_validator.domain.snapshot import UnitSnapshot
+from agentic_validator.domain.standard import GOVERNANCE_FILE, MAX_DESCRIPTION_LENGTH
 
 # Los siete campos de gobierno que la demo guardaba en el frontmatter y que hoy viven en otro sitio.
 GOVERNANCE_FIELDS_IN_FRONTMATTER = frozenset(
     {"id", "owner_team", "owner_contact", "status", "version", "standard_version", "data_classification"}
 )
-
-# Las dos grafías con las que un agente restringe su servidor. Medido el 7 de septiembre de 2026 (D7):
-# cada cliente ignora en silencio la que no entiende, así que hacen falta las dos.
-CLAUDE_MCP_TOOL_PREFIX = "mcp__plugin_"
-COPILOT_MCP_TOOL_SUFFIX = "/*"
 
 # C3 aplica a lo que interpreta contenido externo: skill, prompt y agente (03 §3). Una unidad que sólo
 # expone un servidor o unos hooks no lo interpreta.
@@ -125,56 +111,6 @@ def check_catalog_metadata_is_text(snapshot: UnitSnapshot) -> tuple[Finding, ...
     return tuple(findings)
 
 
-def check_agent_mcp_spellings(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
-    """D7: si el agente restringe su servidor, declara las dos grafías; si no restringe, avisa."""
-    if not snapshot.has_mcp:
-        return ()
-    findings: list[Finding] = []
-    for agent in snapshot.agents:
-        tools = (agent.frontmatter or {}).get("tools")
-        if not isinstance(tools, list):
-            findings.append(
-                warning(
-                    "artifact.agent-inherits-everything",
-                    agent.path,
-                    "el agente no declara tools y hereda todo lo instalado en la sesión, que es lo contrario de C1",
-                )
-            )
-            continue
-        names = [str(tool) for tool in tools]
-        has_claude = any(name.startswith(CLAUDE_MCP_TOOL_PREFIX) for name in names)
-        has_copilot = any(name.endswith(COPILOT_MCP_TOOL_SUFFIX) and not name.startswith("mcp__") for name in names)
-        if not has_claude and not has_copilot:
-            continue
-        own_unit_marker = f"{CLAUDE_MCP_TOOL_PREFIX}{snapshot.name}_"
-        foreign = [n for n in names if n.startswith(CLAUDE_MCP_TOOL_PREFIX) and not n.startswith(own_unit_marker)]
-        if foreign:
-            findings.append(
-                error(
-                    "artifact.agent-mcp-of-another-unit",
-                    agent.path,
-                    f"{foreign[0]!r} apunta al servidor de otra unidad; el servidor viaja en la misma unidad que el agente",
-                )
-            )
-        if not has_claude:
-            findings.append(
-                error(
-                    "artifact.agent-missing-claude-spelling",
-                    agent.path,
-                    "el agente restringe el servidor sólo con la grafía de Copilot; Claude rehúsa lanzarlo",
-                )
-            )
-        if not has_copilot:
-            findings.append(
-                error(
-                    "artifact.agent-missing-copilot-spelling",
-                    agent.path,
-                    "el agente restringe el servidor sólo con la grafía de Claude; Copilot lo arranca sin el servidor y no avisa",
-                )
-            )
-    return tuple(findings)
-
-
 def check_external_content_declared(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
     """C3 se exige según el tipo de lo que la unidad contiene, no siempre."""
     governance = snapshot.governance
@@ -192,75 +128,3 @@ def check_external_content_declared(snapshot: UnitSnapshot) -> tuple[Finding, ..
             ),
         )
     return ()
-
-
-def check_eval_suites(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
-    """La suite no es obligatoria aquí, pero si la unidad la trae tiene que tener la forma exigida."""
-    findings: list[Finding] = []
-    for suite in snapshot.eval_suites:
-        if suite.error:
-            findings.append(error("evals.unreadable", suite.path, f"no se pudo interpretar: {suite.error}"))
-            continue
-        tests = (suite.content or {}).get("tests")
-        if not isinstance(tests, list) or len(tests) < MIN_EVAL_CASES:
-            findings.append(
-                error("evals.too-few-cases", suite.path, f"la suite necesita al menos {MIN_EVAL_CASES} casos")
-            )
-            continue
-        findings.extend(_check_suite_cases(suite.path, tests))
-    return tuple(findings)
-
-
-def _check_suite_cases(path: str, tests: list) -> list[Finding]:
-    findings: list[Finding] = []
-    categories: set[str] = set()
-    for case in tests:
-        metadata = case.get("metadata") if isinstance(case, dict) else None
-        category = (metadata or {}).get("category") if isinstance(metadata, dict) else None
-        description = (case.get("description") if isinstance(case, dict) else None) or "sin descripción"
-        if category is None:
-            findings.append(
-                error("evals.case-without-category", path, f"el caso {description!r} no declara metadata.category")
-            )
-        else:
-            categories.add(str(category))
-        assertions = case.get("assert") if isinstance(case, dict) else None
-        types = {a.get("type") for a in assertions} if isinstance(assertions, list) else set()
-        if not types & DETERMINISTIC_ASSERT_TYPES:
-            findings.append(
-                error(
-                    "evals.case-without-deterministic-assertion",
-                    path,
-                    f"el caso {description!r} sólo se sostiene en el juez; sin él no dice nada",
-                )
-            )
-    missing = sorted(REQUIRED_EVAL_CATEGORIES - categories)
-    if missing:
-        findings.append(
-            error("evals.missing-categories", path, f"la suite no cubre las categorías: {', '.join(missing)}")
-        )
-    return findings
-
-
-def check_every_artifact_has_its_suite(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
-    """Skill, agente y prompt necesitan suite para publicar (02 §8.2).
-
-    Avisa en vez de bloquear: estas reglas corren también en el push, cuando el autor todavía está
-    trabajando y la suite puede no existir. El bloqueo es de la verificación de la solicitud de cambio.
-    """
-    if not snapshot.text_artifacts:
-        return ()
-    suite_paths = {suite.path for suite in snapshot.eval_suites}
-    findings: list[Finding] = []
-    for artifact in snapshot.text_artifacts:
-        name = artifact.expected_name
-        expected = (f"{EVALS_DIR}/{name}/promptfooconfig.yaml", f"{EVALS_DIR}/promptfooconfig.yaml")
-        if not any(path in suite_paths for path in expected):
-            findings.append(
-                warning(
-                    "evals.suite-missing",
-                    artifact.path,
-                    f"no tiene suite en {expected[0]}; sin ella no se llega a Experimental",
-                )
-            )
-    return tuple(findings)

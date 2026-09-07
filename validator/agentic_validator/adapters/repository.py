@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from agentic_validator.domain.model import GOVERNANCE_FILE
+from agentic_validator.domain.standard import GOVERNANCE_FILE
 
 log = logging.getLogger(__name__)
 

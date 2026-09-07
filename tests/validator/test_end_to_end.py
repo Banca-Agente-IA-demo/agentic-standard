@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 
 from agentic_validator.cli import main, review_unit
-from agentic_validator.domain.model import Verdict
+from agentic_validator.domain.findings import Verdict
 
 from tests.validator.units import CREDENTIAL, SERVER, add_agent, add_skill, build_unit, read_governance, write_governance
 
