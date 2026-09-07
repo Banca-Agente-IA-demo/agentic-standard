@@ -111,3 +111,17 @@ def test_una_unidad_borrada_entera_no_se_comprueba(tmp_path):
     _git(root, "commit", "-q", "-m", "borra la rota")
     run = review_changed_units(root, "main")
     assert [informe.unit for informe in run.reports] == []
+
+
+def test_el_informe_nombra_el_repositorio_aunque_la_ruta_sea_relativa(tmp_path, monkeypatch, capsys):
+    # Medido en la primera ejecución real del registro: `.name` de una ruta relativa como `.` es la
+    # cadena vacía, y el informe salía diciendo «sobre  (1 unidades tocadas)».
+    root = _domain_repository(tmp_path)
+    _git(root, "switch", "-q", "-c", "feat/algo")
+    add_skill(root / "plugins" / "demo-unit")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "toca la sana")
+    monkeypatch.chdir(root)
+    main([".", "--changed-since", "main"])
+    salida = capsys.readouterr().out
+    assert "sobre agents-demo (1 unidad tocada)" in salida
