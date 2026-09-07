@@ -1,0 +1,62 @@
+# Suite de evals de <<NAME>>.
+#
+# DÓNDE VA: `evals/<<NAME>>/promptfooconfig.yaml` dentro de la unidad (o `evals/promptfooconfig.yaml`
+# si la unidad es un solo artefacto). Es OBLIGATORIA para skill, prompt y agente: sin suite completa en
+# verde no se llega a Experimental (02 §8.2). No hay otro formato de suite: éste es el que el motor
+# ejecuta y sobre el que el validador comprueba los cinco principios.
+#
+# NO DECLARA `providers` A PROPÓSITO. El proveedor se inyecta al ejecutar, desde el repositorio del
+# estándar, y así un solo archivo sirve para los dos clientes. Las TRES EJECUCIONES POR CASO y el UMBRAL
+# 0,66 tampoco van aquí: los fija el job `evals` al invocar el motor.
+#
+# LO QUE EL VALIDADOR EXIGE SOBRE ESTE ARCHIVO (D4):
+#   1. Al menos TRES casos en `tests`.
+#   2. Cada caso lleva `metadata.category` con uno de tres valores: happy_path, edge_case, negative.
+#   3. Hay al menos UN caso de CADA categoría.
+#   4. Cada caso tiene al menos una aserción DETERMINISTA (contains, icontains, not-contains, regex,
+#      is-json, javascript...). Un caso sostenido sólo por `llm-rubric` es error: cuando el juez no está
+#      disponible, un caso con ancla sigue dando información y uno sin ancla no dice nada.
+description: <<NAME>> · <<WHAT_IS_EVALUATED>>
+
+prompts:
+  - "{{query}}"
+
+tests:
+  # ── CAMINO ESPERADO: lo que el artefacto dice hacer ─────────────────────────────────────────
+  - description: <<HAPPY_PATH_CASE>>
+    metadata:
+      category: happy_path
+    vars:
+      query: "<<QUERY>>"
+    assert:
+      - type: icontains
+        value: <<WORD_THAT_MUST_APPEAR>>
+      # Al juez sólo lo que ninguna comprobación mecánica alcanza: coherencia, pertinencia, calidad de
+      # una explicación. Redactado como AFIRMACIÓN COMPROBABLE contra la salida, no como «está bien».
+      - type: llm-rubric
+        value: >
+          <<VERIFIABLE_CRITERION>>
+
+  # ── BORDE: el límite de lo que sabe resolver ─────────────────────────────────────────────────
+  - description: <<EDGE_CASE>>
+    metadata:
+      category: edge_case
+    vars:
+      query: "<<EDGE_QUERY>>"
+    assert:
+      - type: icontains
+        value: <<EDGE_WORD>>
+
+  # ── NEGATIVO: una situación en la que DEBE ABSTENERSE ────────────────────────────────────────
+  # Es la omisión más frecuente y produce artefactos que «siempre encuentran algo que hacer». Un
+  # near-miss: algo que COMPARTE VOCABULARIO con el artefacto pero necesita otra cosa.
+  # La forma cambia según el tipo: para un SKILL se comprueba que NO SE ACTIVE; para un AGENTE, que se
+  # invoca explícitamente y no puede no activarse, que SE ABSTENGA de lo que no le corresponde.
+  - description: <<NEGATIVE_CASE>>
+    metadata:
+      category: negative
+    vars:
+      query: "<<UNRELATED_QUERY>>"
+    assert:
+      - type: not-contains
+        value: <<SIGNAL_THAT_IT_ACTED_WHEN_IT_SHOULD_NOT>>

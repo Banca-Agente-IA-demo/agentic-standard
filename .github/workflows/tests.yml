@@ -12,6 +12,7 @@ on:
       - "tools/**"
       - "tests/**"
       - "schemas/**"
+      - "templates/**"
       - "config/teams.json"
       - "pyproject.toml"
       - ".github/workflows/tests.yml"

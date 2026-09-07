@@ -1,0 +1,15 @@
+{
+  "_INSTRUCTIONS": "Este NO es un archivo suelto: es el bloque `mcp` que se PEGA dentro del GOVERNANCE.json de la unidad, al mismo nivel que `permissions`. LA CLAVE ES EL NOMBRE DEL SERVIDOR y tiene que ser EXACTAMENTE la única clave de `mcpServers` en `.mcp.json` y el único elemento de `permissions.mcp_servers`: una unidad, un servidor (D2). Borra esta clave y la siguiente al pegarlo.",
+  "_CREDENTIALS": "`credentials` es la lista de NOMBRES de variables o cabeceras, nunca sus valores. El validador la contrasta con los `${VAR}` de `env` y `headers` en `.mcp.json`: declarar cero y usar una es error, y al revés también. Si la lista no está vacía, `credentials_owner` es OBLIGATORIO: la unidad viaja sin el secreto, el cliente lo pide al instalar, y quien publica no es quien concede el acceso. `tools_digest` lo propone el asistente de autoría consultando al servidor; no se teclea a mano. La conexión (url, comando, transporte) vive en `.mcp.json` y NO se repite aquí; la aprobación vive en la solicitud de cambio y NO se repite aquí.",
+  "mcp": {
+    "<<SERVER>>": {
+      "write_operations": false,
+      "credentials": ["<<CREDENTIAL>>"],
+      "credentials_owner": {
+        "team": "<<CUSTODIAN_TEAM>>",
+        "access_request_url": "<<ACCESS_REQUEST_URL>>"
+      },
+      "tools_digest": "sha256:<<TOOLS_DIGEST>>"
+    }
+  }
+}

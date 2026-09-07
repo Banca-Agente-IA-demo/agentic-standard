@@ -11,7 +11,8 @@ import copy
 
 from jsonschema import Draft202012Validator
 
-from tests.schemas.conftest import errors_of, load_fixture
+from tests.schemas.conftest import load_fixture
+from tests.support import errors_of
 
 CLAUDE_INDEX = "marketplace-exp.claude-code.json"
 COPILOT_INDEX = "marketplace-exp.copilot.json"

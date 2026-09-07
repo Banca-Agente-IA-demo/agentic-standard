@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "<<SERVER>>": {
+      "type": "http",
+      "url": "<<URL>>",
+      "headers": {
+        "Authorization": "Bearer ${<<CREDENTIAL>>}"
+      }
+    }
+  }
+}
