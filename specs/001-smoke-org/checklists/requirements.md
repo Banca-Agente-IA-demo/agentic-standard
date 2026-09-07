@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain (quedan 2, con valor por defecto; se resuelven en
+- [x] No [NEEDS CLARIFICATION] markers remain (quedan 2, con valor por defecto; se resuelven en
       `/speckit-clarify`)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
@@ -32,8 +32,10 @@
 
 ## Notes
 
-- Validación del 2026-09-07: todos los puntos pasan salvo los dos marcadores de aclaración, que son
-  de alcance (qué más comprobar) y tienen valor por defecto. Siguiente paso: `/speckit-clarify`.
+- Validación del 2026-09-07 (specify): todos los puntos pasan salvo los dos marcadores de aclaración,
+  que son de alcance (qué más comprobar) y tienen valor por defecto.
+- Revalidación del 2026-09-07 (clarify): cinco preguntas resueltas e integradas; sin marcadores.
+  16/16. Siguiente paso: `/speckit-plan`.
 - FR-002 y FR-014 nombran archivos y nombres del estándar (`config/teams.json`, los tres contextos).
   No son detalles de implementación: son el contrato que la prueba debe leer, fijado por la
   constitución (principio V).

@@ -102,7 +102,10 @@ y fallan exactamente las comprobaciones de plan y permiso base.
   comprueba lo que debe existir, no prohíbe lo demás, salvo el topic de dominio en repositorios que no
   son de dominio.
 - La cuenta que ejecuta la prueba puede leer unos ámbitos y no otros: cada comprobación que no pudo
-  consultarse se marca como «no comprobada» y el veredicto global no puede ser «pasa».
+  consultarse se marca como «no comprobada», el veredicto global no puede ser «pasa» y el indicador de
+  terminación es «no se pudo comprobar» aunque además haya fallos.
+- La App está instalada con selección explícita de repositorios que incluye todos los esperados: pasa.
+  Si la selección omite alguno de los esperados, falla nombrándolo.
 
 ## Requirements *(mandatory)*
 
@@ -113,15 +116,18 @@ y fallan exactamente las comprobaciones de plan y permiso base.
 - **FR-002**: La prueba MUST comprobar que existe cada equipo que declara el mapa de papeles a equipos
   del estándar (`config/teams.json`), tomando los nombres de ese mapa y no de una lista propia.
 - **FR-003**: La prueba MUST comprobar que la App del ciclo de vida está instalada en la organización
-  y que su instalación cubre todos los repositorios.
+  y que su instalación cubre todos los repositorios: bien porque declara cobertura de toda la
+  organización, bien porque su selección explícita incluye todos los repositorios del entorno esperado.
+  Cada repositorio esperado fuera de la instalación es un fallo que lo nombra.
 - **FR-004**: La prueba MUST comprobar que cada repositorio de la plataforma y de dominio tiene los
   dos secretos de la App, por nombre exacto.
 - **FR-005**: La prueba MUST comprobar que cada marketplace tiene las dos variables esperadas y que el
   valor del canal de cada marketplace es el que le corresponde.
 - **FR-006**: La prueba MUST comprobar que todos los repositorios de dominio llevan el topic de
   descubrimiento y que ningún otro repositorio de la organización lo lleva.
-- **FR-007**: La prueba MUST comprobar que cada repositorio de dominio tiene activos el ruleset de la
-  rama principal y el ruleset de etiquetas.
+- **FR-007**: La prueba MUST comprobar que cada repositorio de dominio tiene el ruleset de la rama
+  principal (`protect-main`) y el ruleset de etiquetas (`protect-tags`), identificados por nombre
+  exacto y ambos en modo activo. Un ruleset con otro nombre o en otro modo no cuenta.
 - **FR-008**: La prueba MUST comprobar que el ruleset de la rama principal exige exactamente los tres
   contextos requeridos del estándar, sin otros, y que cada uno declara el origen esperado.
 - **FR-009**: La prueba MUST ejecutar todas las comprobaciones aunque alguna falle, y el informe MUST
@@ -131,14 +137,17 @@ y fallan exactamente las comprobaciones de plan y permiso base.
   encontrado, MUST mostrar ambos.
 - **FR-011**: La prueba MUST distinguir tres resultados por comprobación: superada, fallida y no
   comprobada (no se pudo consultar). El veredicto global MUST ser «pasa» sólo si todas están superadas.
-- **FR-012**: La prueba MUST terminar con un indicador de éxito o fallo que otro proceso pueda
-  consumir sin leer el informe, además del informe legible para personas.
+- **FR-012**: La prueba MUST terminar con uno de tres indicadores que otro proceso pueda consumir sin
+  leer el informe: pasa, no pasa, no se pudo comprobar. Si conviven comprobaciones fallidas y no
+  comprobadas, el indicador es «no se pudo comprobar», porque el informe está incompleto. El informe
+  legible para personas se emite en todos los casos.
 - **FR-013**: Los valores esperados que difieren entre entornos (nombre de la organización, plan,
   permiso base, ajuste de creación de repositorios, lista de repositorios por tipo) MUST vivir
   separados de las comprobaciones, de modo que cambiar de entorno no cambie qué se comprueba.
 - **FR-014**: Los nombres que son contrato del estándar (los tres contextos requeridos, los nombres de
-  los dos secretos y de las dos variables, el topic de descubrimiento, el nombre de la App) MUST estar
-  definidos una sola vez y MUST ser los mismos que usan los workflows y la guía.
+  los dos secretos y de las dos variables, el topic de descubrimiento, el nombre de la App, los nombres
+  de los dos rulesets) MUST estar definidos una sola vez y MUST ser los mismos que usan los workflows,
+  los archivos de rulesets y la guía.
 - **FR-015**: La prueba MUST ser de sólo lectura: no crea, modifica ni borra nada en GitHub.
 
 ### Key Entities
@@ -177,20 +186,29 @@ y fallan exactamente las comprobaciones de plan y permiso base.
 - La existencia de un secreto se comprueba por su nombre; su valor no es legible y no se valida.
 - La lista de repositorios de dominio del entorno esperado es la fuente de verdad para «qué debe
   llevar el topic»; el topic en un repositorio fuera de esa lista es un fallo.
-- Los ajustes de fusión y seguridad de cada repositorio (guía §5) quedan fuera de esta capacidad: la
-  guía §10 no los incluye en la prueba de humo. Pueden entrar en una spec posterior.
+- Los ajustes de fusión y seguridad de cada repositorio (guía §5) y los permisos de los equipos sobre
+  los repositorios (guía §6) quedan fuera de esta capacidad: la guía §10 no los incluye en la prueba
+  de humo. Son candidatos a una spec posterior que amplíe la prueba.
 - La prueba se ejecuta desde la máquina de una persona del equipo de plataforma. Ejecutarla de forma
   programada en la organización exigiría a la App permisos de administración que hoy no tiene y que la
   guía no pide; queda fuera de esta capacidad.
 
 ## Clarifications
 
-Pendientes para `/speckit-clarify`; ninguna bloquea la redacción y todas tienen un valor por defecto
-anotado en Assumptions.
+### Session 2026-09-07
 
-- [NEEDS CLARIFICATION: ¿la prueba debe también verificar los ajustes de fusión y seguridad por
-  repositorio de la guía §5 (sólo squash, borrar rama al fusionar, sin wiki ni projects, secret
-  scanning), o se limita a la lista de la guía §10? Por defecto: sólo §10.]
-- [NEEDS CLARIFICATION: ¿la comprobación de los permisos de los equipos sobre los repositorios (guía
-  §6) forma parte de esta prueba? Es configuración, no personas, y está en el mismo archivo que los
-  equipos. Por defecto: no, para mantener la primera spec pequeña.]
+- Q: ¿La prueba verifica también los ajustes de fusión y seguridad por repositorio de la guía §5 (sólo
+  squash, borrar rama al fusionar, sin wiki ni projects, secret scanning)? → A: No. Se limita a la
+  lista de la guía §10. Los ajustes de §5 quedan para una spec posterior.
+- Q: ¿La prueba verifica los permisos de los equipos sobre los repositorios (guía §6)? → A: No. Fuera
+  de alcance en esta spec, para mantenerla pequeña; candidata a la misma spec posterior que §5.
+- Q: ¿Cómo se distingue para otro proceso el veredicto «no pasa» del «no se pudo comprobar»? → A: Con
+  tres indicadores de terminación distintos: pasa, no pasa, no se pudo comprobar. «No se pudo
+  comprobar» prevalece sobre «no pasa» cuando conviven, porque el informe está incompleto.
+- Q: ¿Cuándo se considera que la instalación de la App «cubre todos los repositorios»? → A: Cuando la
+  instalación declara cobertura de todos los repositorios de la organización, o cuando su selección
+  explícita incluye todos los repositorios del entorno esperado. Cualquier repositorio esperado fuera
+  de la instalación es un fallo que lo nombra.
+- Q: ¿Cómo se identifican los dos rulesets de un repositorio de dominio? → A: Por nombre exacto,
+  `protect-main` y `protect-tags`, que pasan a ser nombres contrato del estándar, y por estar en
+  modo activo. Un ruleset con otro nombre no cuenta aunque tenga las mismas reglas.
