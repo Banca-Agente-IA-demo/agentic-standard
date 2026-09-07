@@ -104,7 +104,11 @@ def review_changed_units(repository_root: Path, base: str, repository: str | Non
         touched = units_touched(changed.paths, roots)
     log.info("unidades a comprobar: %s", ", ".join(touched) or "ninguna")
     reports = tuple(review_unit(repository_root / unit, repository) for unit in touched)
-    return RunReport(scope=f"{repository_root.name} ({len(touched)} unidades tocadas)", reports=reports)
+    # `.name` de una ruta relativa como `.` es la cadena vacía, y el informe salía sin decir sobre
+    # qué repositorio hablaba. Se resuelve antes de nombrarlo.
+    name = repository_root.resolve().name
+    unidades = "1 unidad tocada" if len(touched) == 1 else f"{len(touched)} unidades tocadas"
+    return RunReport(scope=f"{name} ({unidades})", reports=reports)
 
 
 def _run(args: argparse.Namespace) -> RunReport:
