@@ -1,13 +1,14 @@
-"""Layout de la unidad según el árbol de 04 §4, e higiene del contenido versionado (C2).
+"""Layout de la unidad según el árbol de 04 §4.
 
 El estándar fija dónde vive cada tipo dentro de la unidad; la estructura interna de cada tipo la fija
 la especificación de la herramienta. Un artefacto fuera de su sitio no falla al instalar: el cliente
 sencillamente no lo encuentra.
+
+La higiene del contenido versionado, que también mira el árbol pero juzga lo que hay DENTRO de los
+archivos, vive en `hygiene.py`.
 """
 
 from __future__ import annotations
-
-import re
 
 from agentic_validator.domain.model import (
     GOVERNANCE_FILE,
@@ -24,11 +25,6 @@ ARTIFACT_DIRECTORIES = {
     "agents": (".agent.md",),
     "commands": (".prompt.md",),
 }
-
-# Una ruta absoluta versionada apunta a la máquina de quien la escribió. Se busca sólo en archivos
-# ejecutables o de configuración: en la prosa de un README una ruta suele ser un ejemplo.
-_ABSOLUTE_PATH = re.compile(r"(?:^|[\s\"'(=])(?:/(?:usr|home|opt|etc|var|tmp|Users)/|[A-Za-z]:[\\/])")
-_EXECUTABLE_SUFFIXES = (".json", ".yaml", ".yml", ".sh", ".ps1", ".py", ".bat")
 
 
 def check_no_nested_unit(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
@@ -78,20 +74,3 @@ def check_hooks_bring_tests(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
     )
 
 
-def check_no_absolute_paths(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
-    """C2: una ruta absoluta versionada sólo existe en la máquina de quien la escribió."""
-    findings: list[Finding] = []
-    for path, text in sorted(snapshot.text_contents.items()):
-        if not path.endswith(_EXECUTABLE_SUFFIXES):
-            continue
-        for number, line in enumerate(text.splitlines(), start=1):
-            if _ABSOLUTE_PATH.search(line):
-                findings.append(
-                    error(
-                        "hygiene.absolute-path",
-                        f"{path}:{number}",
-                        "hay una ruta absoluta; use ${CLAUDE_PLUGIN_ROOT} o una ruta relativa a la unidad",
-                    )
-                )
-                break
-    return tuple(findings)

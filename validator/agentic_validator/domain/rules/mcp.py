@@ -12,6 +12,8 @@ from agentic_validator.domain.model import (
     CLIENT_VARIABLES,
     GOVERNANCE_FILE,
     MCP_FILE,
+    MIN_SECRET_VALUE_LENGTH,
+    SECRET_LIKE_CONNECTION_KEYS,
     Finding,
     UnitSnapshot,
     error,
@@ -21,10 +23,6 @@ from agentic_validator.domain.model import (
 # `env` y `headers`; en `args` una ${VAR} es casi siempre una ruta.
 _VARIABLE = re.compile(r"\$\{(?:(?:input|env|secrets|localEnv):)?([A-Za-z_][A-Za-z0-9_]*)\}")
 _CREDENTIAL_HOLDERS = ("env", "headers")
-
-# Un valor con pinta de secreto en claro: cadena larga sin ${...} en una clave que suele llevarlo.
-_SECRET_LIKE_KEYS = ("authorization", "token", "secret", "password", "api_key", "apikey", "key")
-_MIN_SECRET_LENGTH = 12
 
 
 def _servers(snapshot: UnitSnapshot) -> dict:
@@ -169,6 +167,6 @@ def check_no_literal_secrets(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
 def _looks_like_a_literal_secret(key: str, value: str) -> bool:
     if "${" in value:
         return False
-    if len(value) < _MIN_SECRET_LENGTH:
+    if len(value) < MIN_SECRET_VALUE_LENGTH:
         return False
-    return any(marker in key.lower() for marker in _SECRET_LIKE_KEYS)
+    return any(marker in key.lower() for marker in SECRET_LIKE_CONNECTION_KEYS)

@@ -1,4 +1,4 @@
-"""Layout de la unidad (04 §4) e higiene del contenido versionado (C2)."""
+"""Layout de la unidad (04 §4)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ def _rules(snap) -> list[str]:
         layout.check_no_nested_unit(snap)
         + layout.check_artifacts_are_in_their_directory(snap)
         + layout.check_hooks_bring_tests(snap)
-        + layout.check_no_absolute_paths(snap)
     )
     return [f.rule for f in findings]
 
@@ -61,21 +60,3 @@ def test_unos_hooks_sin_pruebas_son_error():
 def test_unos_hooks_con_pruebas_no_producen_hallazgo():
     files = ("hooks/hooks.json", "hooks/scripts/check.sh", "hooks/tests/test_check.sh")
     assert "layout.hooks-without-tests" not in _rules(snapshot(hooks=hooks_config(), files=files))
-
-
-def test_una_ruta_absoluta_en_un_archivo_ejecutable_es_error():
-    # Sólo existe en la máquina de quien la escribió.
-    for ruta in ("/home/ana/scripts/x.sh", "C:\\Users\\ana\\x.ps1", "/usr/local/bin/tool"):
-        contents = {"hooks/scripts/check.sh": f"#!/bin/sh\n{ruta} --run\n"}
-        assert "hygiene.absolute-path" in _rules(snapshot(text_contents=contents)), ruta
-
-
-def test_una_ruta_de_la_unidad_no_es_una_ruta_absoluta():
-    contents = {"hooks/scripts/check.sh": "#!/bin/sh\n${CLAUDE_PLUGIN_ROOT}/hooks/scripts/otro.sh\n"}
-    assert _rules(snapshot(text_contents=contents)) == []
-
-
-def test_una_ruta_en_la_prosa_de_un_documento_no_se_juzga():
-    # En un README una ruta suele ser un ejemplo; el ruido ahí no aporta.
-    contents = {"README.md": "Instálalo en /usr/local/share si quieres.\n"}
-    assert _rules(snapshot(text_contents=contents)) == []

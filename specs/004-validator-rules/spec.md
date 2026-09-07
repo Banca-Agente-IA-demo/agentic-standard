@@ -244,6 +244,18 @@ mismo del repositorio; instalarlo en un entorno limpio y ejecutar el comando.
   resuelve desde el editor.
 - **FR-019**: Las reglas MUST ser comprobables con datos, sin leer disco ni red, y el paquete MUST
   tener pruebas de cada una en CI.
+- **FR-026**: El validador MUST señalar como error una credencial escrita en claro en **cualquier**
+  archivo de texto de la unidad, no sólo en la conexión del servidor. Reconoce dos formas: un valor
+  con prefijo de proveedor conocido, que se busca en todos los archivos porque no admite otra lectura,
+  y un valor de entropía alta asignado a una clave que suele llevar credencial, que se busca sólo en
+  archivos de configuración o de código. El validador MUST NOT señalar una referencia a una variable,
+  un hueco de plantilla, un valor de entropía baja como un digesto de ejemplo, ni una asignación
+  escrita en la prosa de un documento.
+- **FR-027**: El validador MUST avisar, sin bloquear, cuando un archivo de una carpeta de apoyo de la
+  unidad no lo referencia ningún artefacto de la unidad. Es aviso porque no rompe nada: el archivo
+  viaja en cada instalación y no se usa, y el material puede ser del autor deliberadamente no
+  referenciado. El detector de la mención MUST ser permisivo, porque el lado seguro de la
+  equivocación es no avisar.
 
 ### Key Entities
 

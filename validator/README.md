@@ -41,7 +41,8 @@ del árbol; `--repository` lo fuerza cuando la unidad no está en su sitio habit
 | Hooks (D3, C5) | Tope de tiempo en cada acción, con el nombre correcto y bajo el techo del estándar; comando dentro de la unidad; sin descarga en ejecución; pruebas en `hooks/tests/`; eventos portables (aviso) |
 | Artefactos (D1, D7, C3) | Nombre declarado igual al que impone la ruta; descripción no vacía y dentro del máximo del formato; ningún campo de gobierno en el frontmatter; mapa de catálogo texto a texto; las dos grafías del agente que restringe servidor, con el nombre de su propia unidad; tratamiento de contenido externo según el tipo |
 | Evaluación (D4) | Cada artefacto de texto trae su suite (aviso si falta); en la que trae: mínimo de casos, las tres categorías, y una aserción mecánica por caso |
-| Layout e higiene (04 §4, C2) | Cada artefacto en su carpeta; sin unidades anidadas; sin rutas absolutas en archivos ejecutables o de configuración |
+| Layout (04 §4) | Cada artefacto en su carpeta; sin unidades anidadas; los hooks traen sus pruebas |
+| Higiene (C2) | Sin rutas absolutas en archivos ejecutables o de configuración; sin credenciales en claro en ningún archivo de la unidad, ni por prefijo de proveedor ni por valor de entropía alta asignado a una clave sospechosa; sin archivos de apoyo que ningún artefacto referencie (aviso) |
 | Riesgo (03 §1) | El nivel declarado nunca por debajo del mínimo calculado de hechos |
 
 ## Qué no comprueba, a propósito
@@ -57,7 +58,13 @@ del árbol; `--repository` lo fuerza cuando la unidad no está en su sitio habit
 - **Que el contrato declarado del servidor corresponda con lo que el servidor expone**: exige
   arrancarlo. Es del asistente al proponer el contrato, y del reloj que vigila el cambio externo.
 
-La **ausencia de suite** sí se señala, pero como aviso: se exige para publicar, no para registrar.
+La **ausencia de suite** sí se señala, pero como aviso: se exige para publicar, no para registrar. Lo
+mismo vale para un **archivo de apoyo sin referencia**: no rompe nada, sólo engorda la unidad, y el
+material puede ser del autor deliberadamente no referenciado.
+
+El escaneo de secretos mira el **paquete propio**, no lo que un servidor remoto devuelve en ejecución.
+Está calibrado para no dar falsos positivos: una referencia `${VAR}`, un hueco de plantilla, un
+digesto de ejemplo con ceros y una asignación escrita en la prosa de un documento no disparan.
 
 ## Cómo viaja el contrato de gobierno
 
