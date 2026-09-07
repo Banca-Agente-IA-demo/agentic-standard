@@ -14,7 +14,7 @@ prompts, agentes, configuraciones MCP, hooks) y los controles que lo hacen exigi
 | `validator/` | Los controles de publicación, con sus pruebas |
 | `index/` | Generación del índice de los marketplaces |
 | `evals/` | Conexión del motor de evaluación con el asistente |
-| `templates/` | El punto de partida de una unidad y de cada artefacto |
+| `templates/` | El punto de partida de una unidad, agrupada o individual, y de cada tipo de artefacto. Los huecos se marcan con `<<NOMBRE>>` |
 | `docs/` | La norma (`guidelines/`), el diseño (`design/`), las guías (`guides/`) y el material de gobierno |
 | `plugins/` | Los asistentes de autoría y de consumo, que pasan por las mismas reglas que publican |
 | `config/teams.json` | Mapa de cada papel del ciclo de vida al equipo de GitHub que lo ejerce |

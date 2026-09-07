@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import copy
 
-from tests.schemas.conftest import errors_of
+from tests.support import errors_of
 
 # Campos de primer nivel que la demo anterior guardaba aquí y que hoy se derivan de un hecho. La
 # revisión del hito 1 los retiró uno a uno; el esquema es lo único que impide que vuelvan.

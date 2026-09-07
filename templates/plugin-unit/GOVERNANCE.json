@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "id": "<<REPO>>/<<NAME>>",
+  "owner": {
+    "team": "<<TEAM>>",
+    "contact": "<<CONTACT>>"
+  },
+  "data_classification": "internal",
+  "permissions": {
+    "tools": [],
+    "commands": [],
+    "mcp_servers": []
+  },
+  "external_content": "<<EXTERNAL_CONTENT>>",
+  "x_extensions": {}
+}
