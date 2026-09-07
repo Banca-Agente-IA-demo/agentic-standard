@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from agentic_validator.adapters.report import NOTHING_TO_CHECK, render_json, render_text
-from agentic_validator.domain.model import Report, RunReport, Severity, Verdict, error, warning
+from agentic_validator.domain.findings import Report, RunReport, Severity, Verdict, error, warning
 
 import json
 

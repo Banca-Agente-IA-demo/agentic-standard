@@ -21,7 +21,8 @@ from agentic_validator.adapters.reading import read_unit
 from agentic_validator.adapters.report import render_json, render_text
 from agentic_validator.adapters.repository import changed_paths, unit_roots
 from agentic_validator.domain.discovery import units_touched
-from agentic_validator.domain.model import Report, RunReport, ValidatorError, Verdict
+from agentic_validator.domain.findings import Report, RunReport, Verdict
+from agentic_validator.domain.snapshot import ValidatorError
 from agentic_validator.domain.rules import run_rules
 
 log = logging.getLogger(__name__)

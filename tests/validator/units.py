@@ -11,7 +11,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from agentic_validator.domain.model import TextArtifact, UnitSnapshot
+from agentic_validator.domain.snapshot import TextArtifact, UnitSnapshot
 
 from tests.templates.markers import instantiate, read_template
 

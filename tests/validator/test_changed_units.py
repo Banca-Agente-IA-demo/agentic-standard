@@ -8,7 +8,7 @@ import subprocess
 import pytest
 
 from agentic_validator.cli import main, review_changed_units
-from agentic_validator.domain.model import Verdict
+from agentic_validator.domain.findings import Verdict
 
 from tests.validator.units import add_skill, build_unit, read_governance, write_governance
 

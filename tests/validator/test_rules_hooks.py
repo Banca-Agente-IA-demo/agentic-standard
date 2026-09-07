@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from agentic_validator.domain.model import MAX_HOOK_TIMEOUT_SECONDS, Severity
+from agentic_validator.domain.findings import Severity
+from agentic_validator.domain.standard import MAX_HOOK_TIMEOUT_SECONDS
 from agentic_validator.domain.rules import hooks
 
 from tests.validator.units import hooks_config, snapshot

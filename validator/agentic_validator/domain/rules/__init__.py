@@ -8,8 +8,20 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from agentic_validator.domain.model import Finding, UnitSnapshot
-from agentic_validator.domain.rules import artifacts, hooks, hygiene, identity, layout, mcp, permissions, risk
+from agentic_validator.domain.findings import Finding
+from agentic_validator.domain.rules import (
+    agent_tools,
+    artifacts,
+    evals,
+    hooks,
+    hygiene,
+    identity,
+    layout,
+    mcp,
+    permissions,
+    risk,
+)
+from agentic_validator.domain.snapshot import UnitSnapshot
 
 Rule = Callable[[UnitSnapshot], tuple[Finding, ...]]
 
@@ -35,10 +47,10 @@ ALL_RULES: tuple[Rule, ...] = (
     artifacts.check_artifact_descriptions,
     artifacts.check_no_governance_in_frontmatter,
     artifacts.check_catalog_metadata_is_text,
-    artifacts.check_agent_mcp_spellings,
+    agent_tools.check_agent_mcp_spellings,
     artifacts.check_external_content_declared,
-    artifacts.check_eval_suites,
-    artifacts.check_every_artifact_has_its_suite,
+    evals.check_eval_suites,
+    evals.check_every_artifact_has_its_suite,
     layout.check_no_nested_unit,
     layout.check_artifacts_are_in_their_directory,
     layout.check_hooks_bring_tests,

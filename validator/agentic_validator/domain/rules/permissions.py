@@ -7,7 +7,9 @@ configuración. Sobre skills y prompts no hay nada comparable y la revisión es 
 
 from __future__ import annotations
 
-from agentic_validator.domain.model import GOVERNANCE_FILE, HOOKS_FILE, Finding, UnitSnapshot, error
+from agentic_validator.domain.findings import Finding, error
+from agentic_validator.domain.snapshot import UnitSnapshot
+from agentic_validator.domain.standard import GOVERNANCE_FILE, HOOKS_FILE
 from agentic_validator.domain.rules.hooks import command_actions
 
 # Un patrón de herramienta MCP no es una herramienta del cliente: se gobierna por mcp_servers y sus

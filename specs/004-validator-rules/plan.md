@@ -39,7 +39,7 @@ formatos de cliente más allá de lo enumerado en la sección 5 de la revisión.
 | (1) Qué decide un script y qué hace el modelo | Todo lo decide el código. El modelo, en el hito 2, leerá un campo del informe. Por eso el comando emite también formato estructurado. | Pasa |
 | (2) Qué comandos de git ejecuta y sobre qué rama | Ninguno. El validador no toca git. | Pasa |
 | (3) Qué se mide en cada cliente y cómo se convierte en prueba | Las mediciones de D3 y D7 pasan a reglas, cada una con su prueba y el comentario de dónde se midió. La forma de los `${VAR}` y las variables del cliente que se excluyen vienen medidas de la demo. | Pasa |
-| (4) Qué es dominio puro y qué adaptador | Paquetes por capa (G5): `domain/` con `model.py` y `rules/`, sin disco ni formatos; `adapters/` con la lectura, el frontmatter, el contrato y el informe; `cli.py` como único composition root. Sin `ports/`, justificado abajo y en el docstring de `cli.py`. Hay pruebas de arquitectura que lo comprueban. | Pasa |
+| (4) Qué es dominio puro y qué adaptador | Paquetes por capa (G5): `domain/` con `standard.py`, `findings.py`, `snapshot.py`, `discovery.py` y `rules/`, sin disco ni formatos; `adapters/` con la lectura, el frontmatter, el contrato y el informe; `cli.py` como único composition root. Sin `ports/`, justificado abajo y en el docstring de `cli.py`. Hay pruebas de arquitectura que lo comprueban. | Pasa |
 | (5) Qué nombres nuevos son contrato | El nombre del comando `rules`, el de la distribución, los identificadores de regla que aparecen en cada hallazgo y los códigos de salida. | Pasa |
 | (6) Qué escribe cada script y dónde | Nada en disco. Informe a la salida estándar, diagnóstico a la de error. | Pasa |
 | (7) Qué eventos y jobs añade cada workflow | Ninguno nuevo aquí. Se amplían las rutas del workflow de pruebas para cubrir `validator/`. El workflow reutilizable de registro es la spec 005. | Pasa |
@@ -66,19 +66,27 @@ validator/
     ├── __init__.py
     ├── cli.py                   composition root: argumentos, cableado, código de salida
     ├── domain/                  puro: sin disco, sin red, sin formatos
-    │   ├── model.py             severidad, hallazgo, informe, nivel de riesgo, instantánea
+    │   ├── standard.py          vocabulario fijo: nombres, umbrales y la escala de riesgo
+    │   ├── findings.py          hallazgo, severidad, informe y el veredicto que se deriva
+    │   ├── snapshot.py          la instantánea de una unidad y el fallo de no poder construirla
+    │   ├── discovery.py         de las rutas tocadas a las unidades que hay que revisar
     │   └── rules/               una responsabilidad por módulo
     │       ├── __init__.py      la lista ALL_RULES y el recorrido
     │       ├── identity.py      repositorio, nombre, versión, campos del manifiesto
     │       ├── permissions.py   herramientas, ejecutables y servidor contra lo declarado
     │       ├── mcp.py           un servidor por unidad, claves emparejadas, credenciales
     │       ├── hooks.py         tope de tiempo, ruta, descarga, eventos portables
-    │       ├── artifacts.py     nombre y descripción de cada artefacto; suite si la trae
+    │       ├── artifacts.py     lo que la unidad declara por llevar artefactos de texto
+    │       ├── agent_tools.py   las dos grafías con las que un agente restringe su servidor (D7)
+    │       ├── evals.py         forma de la suite y suite por artefacto
+    │       ├── layout.py        cada tipo en su carpeta según el árbol de 04 §4
+    │       ├── hygiene.py       rutas absolutas, credenciales en claro y apoyo huérfano (C2)
     │       └── risk.py          mínimo calculado y comparación con lo declarado
     ├── adapters/                todo lo que toca el exterior
     │   ├── reading.py           de la carpeta de la unidad a la instantánea
     │   ├── frontmatter.py       ayudante compartido: frontmatter de un archivo de texto
     │   ├── contract.py          carga del esquema y validación contra él
+    │   ├── repository.py        raíces de unidad y rutas tocadas, leídas de git
     │   └── report.py            informe legible y estructurado
     └── schemas/                 lo pone el constructor desde ../schemas; no está en el árbol
 

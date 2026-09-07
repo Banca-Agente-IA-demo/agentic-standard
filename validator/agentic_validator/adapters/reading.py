@@ -14,17 +14,8 @@ from pathlib import Path
 import yaml
 
 from agentic_validator.adapters.frontmatter import parse as parse_frontmatter
-from agentic_validator.domain.model import (
-    EVALS_DIR,
-    GOVERNANCE_FILE,
-    HOOKS_FILE,
-    MANIFEST_FILE,
-    MCP_FILE,
-    EvalSuite,
-    TextArtifact,
-    UnitNotFoundError,
-    UnitSnapshot,
-)
+from agentic_validator.domain.snapshot import EvalSuite, TextArtifact, UnitNotFoundError, UnitSnapshot
+from agentic_validator.domain.standard import EVALS_DIR, GOVERNANCE_FILE, HOOKS_FILE, MANIFEST_FILE, MCP_FILE
 
 log = logging.getLogger(__name__)
 

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from agentic_validator.domain.model import MAX_DESCRIPTION_LENGTH, EvalSuite, Severity, TextArtifact
-from agentic_validator.domain.rules import artifacts
+from agentic_validator.domain.findings import Severity
+from agentic_validator.domain.rules import agent_tools, artifacts, evals
+from agentic_validator.domain.snapshot import EvalSuite, TextArtifact
+from agentic_validator.domain.standard import MAX_DESCRIPTION_LENGTH
 
 from tests.validator.units import snapshot, text_artifact, unit_with_mcp, with_governance
 
@@ -14,10 +16,10 @@ def _findings(snap):
         + artifacts.check_artifact_descriptions(snap)
         + artifacts.check_no_governance_in_frontmatter(snap)
         + artifacts.check_catalog_metadata_is_text(snap)
-        + artifacts.check_agent_mcp_spellings(snap)
+        + agent_tools.check_agent_mcp_spellings(snap)
         + artifacts.check_external_content_declared(snap)
-        + artifacts.check_eval_suites(snap)
-        + artifacts.check_every_artifact_has_its_suite(snap)
+        + evals.check_eval_suites(snap)
+        + evals.check_every_artifact_has_its_suite(snap)
     )
 
 

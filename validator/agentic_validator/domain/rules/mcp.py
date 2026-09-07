@@ -8,15 +8,14 @@ from __future__ import annotations
 
 import re
 
-from agentic_validator.domain.model import (
+from agentic_validator.domain.findings import Finding, error
+from agentic_validator.domain.snapshot import UnitSnapshot
+from agentic_validator.domain.standard import (
     CLIENT_VARIABLES,
     GOVERNANCE_FILE,
     MCP_FILE,
     MIN_SECRET_VALUE_LENGTH,
     SECRET_LIKE_CONNECTION_KEYS,
-    Finding,
-    UnitSnapshot,
-    error,
 )
 
 # Formas con las que los clientes referencian una variable, medidas en la demo anterior. Se miran
