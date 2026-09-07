@@ -85,6 +85,15 @@ def test_cada_caso_de_la_plantilla_de_suite_tiene_una_asercion_mecanica():
         assert types & DETERMINISTIC_ASSERT_TYPES, test.get("description")
 
 
+def test_la_plantilla_de_agente_documenta_las_dos_grafias_para_restringir_el_servidor():
+    # D7, medido el 7 de septiembre de 2026: no hay una sola grafía portable. Con sólo la de Claude,
+    # Copilot arranca el agente sin el servidor y no avisa; con sólo la de Copilot, Claude rehúsa
+    # lanzarlo. Cada cliente ignora en silencio la que no entiende, así que van las dos.
+    guidance = read_template("artifacts/agent/NAME.agent.md")
+    assert "mcp__plugin_" in guidance, "falta la grafía de Claude Code"
+    assert "<<SERVER>>/*" in guidance, "falta la grafía de Copilot CLI"
+
+
 def _hook_actions() -> list[tuple[str, dict]]:
     hooks = json.loads(read_template("artifacts/hooks/hooks.json"))["hooks"]
     return [(event, action) for event, groups in hooks.items() for group in groups for action in group["hooks"]]
