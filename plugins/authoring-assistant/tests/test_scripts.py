@@ -91,12 +91,17 @@ def test_guardar_sin_decir_la_accion_es_un_fallo_de_uso(repo):
     assert resultado.returncode == EXIT_COULD_NOT_RUN and "uso:" in resultado.stderr
 
 
-def test_la_comprobacion_de_herramientas_responde_en_esta_maquina(repo):
-    # Aquí están las tres, así que el resultado esperado es que se puede seguir.
+def test_la_comprobacion_de_herramientas_dice_cual_falta_en_vez_de_fallar(repo):
+    # La prueba no puede dar por hecho qué hay instalado: en el runner de CI falta la herramienta de
+    # GitHub y la primera versión de esta prueba, escrita contra la máquina del autor, se cayó allí.
+    # Lo que sí es del código: clasifica siempre, y cuando algo falta lo nombra.
     apply_scenario(repo, "main_clean")
     resultado = run_script("preflight.py", cwd=repo)
     assert resultado.returncode == EXIT_CLASSIFIED
-    assert json.loads(resultado.stdout)["state"] == "ok"
+    documento = json.loads(resultado.stdout)
+    assert documento["state"] in ("ok", "missing_tool")
+    if documento["state"] == "missing_tool":
+        assert documento["missing"], documento
 
 
 def test_los_scripts_funcionan_sin_instalar_nada(repo):
