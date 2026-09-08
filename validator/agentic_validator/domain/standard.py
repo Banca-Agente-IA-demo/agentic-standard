@@ -87,6 +87,11 @@ SECRET_ASSIGNMENT_KEYS = (
 # No hay lista blanca de lo que puede haber dentro, sólo de dónde se busca.
 SUPPORT_DIRECTORIES = ("references", "assets", "scripts", "templates", "examples")
 
+# Carpetas que la unidad no versiona y que sólo existen en la máquina de quien la ejecuta. Mirarlas
+# haría que el validador diera un resultado distinto en local y en CI, que es el peor de los fallos:
+# el autor ve avisos que el gate no ve, o al revés.
+UNVERSIONED_DIRECTORIES = ("__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", ".venv")
+
 DETERMINISTIC_ASSERT_TYPES = frozenset(
     {"contains", "icontains", "not-contains", "regex", "is-json", "javascript"}
 )

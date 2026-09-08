@@ -136,9 +136,12 @@ def _is_mentioned(path: str, text_contents: dict[str, str]) -> bool:
     """El detector es permisivo a propósito: un falso positivo aquí hace que NO se avise, que es el
     lado seguro cuando lo que está en juego es sólo peso muerto."""
     name = path.rsplit("/", 1)[-1]
+    # Un módulo se importa por su nombre sin extensión: `from _entry import emit` no contiene
+    # `_entry.py`. Sin esto, todo archivo compartido entre scripts se avisaba como huérfano.
+    stem = name.rsplit(".", 1)[0]
     for other, text in text_contents.items():
         if other == path:
             continue  # un archivo no se referencia a sí mismo
-        if name in text or path in text:
+        if name in text or path in text or stem in text:
             return True
     return False

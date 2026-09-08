@@ -10,6 +10,10 @@ import sys
 from pathlib import Path
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+TESTS_ROOT = Path(__file__).resolve().parent
 
-if str(PLUGIN_ROOT) not in sys.path:
-    sys.path.insert(0, str(PLUGIN_ROOT))
+# La raíz del plugin, para importar el núcleo como lo hacen los scripts. Y la de estas pruebas, porque
+# el repositorio del estándar ya tiene un paquete `tests` y sus ayudantes se pisarían con éste.
+for path in (PLUGIN_ROOT, TESTS_ROOT):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))

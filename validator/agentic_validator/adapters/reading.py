@@ -15,7 +15,14 @@ import yaml
 
 from agentic_validator.adapters.frontmatter import parse as parse_frontmatter
 from agentic_validator.domain.snapshot import EvalSuite, TextArtifact, UnitNotFoundError, UnitSnapshot
-from agentic_validator.domain.standard import EVALS_DIR, GOVERNANCE_FILE, HOOKS_FILE, MANIFEST_FILE, MCP_FILE
+from agentic_validator.domain.standard import (
+    EVALS_DIR,
+    GOVERNANCE_FILE,
+    HOOKS_FILE,
+    MANIFEST_FILE,
+    MCP_FILE,
+    UNVERSIONED_DIRECTORIES,
+)
 
 log = logging.getLogger(__name__)
 
@@ -146,10 +153,17 @@ _SCANNED_SUFFIXES = (".md", ".json", ".yaml", ".yml", ".sh", ".ps1", ".py", ".ba
 _MAX_SCANNED_BYTES = 512_000
 
 
+def _is_versioned(path: Path, root: Path) -> bool:
+    """Si el archivo forma parte de la unidad o sólo existe en la máquina donde se ejecuta."""
+    return not any(part in UNVERSIONED_DIRECTORIES for part in path.relative_to(root).parts)
+
+
 def _text_contents(root: Path) -> dict[str, str]:
     contents: dict[str, str] = {}
     for path in root.rglob("*"):
         if not path.is_file() or not path.name.endswith(_SCANNED_SUFFIXES):
+            continue
+        if not _is_versioned(path, root):
             continue
         if path.stat().st_size > _MAX_SCANNED_BYTES:
             log.debug("%s supera el tope de lectura para higiene", path.name)
@@ -163,7 +177,11 @@ def _text_contents(root: Path) -> dict[str, str]:
 def _files(root: Path) -> tuple[str, ...]:
     """Todas las rutas relativas de la unidad, para las reglas de layout, higiene y presencia."""
     return tuple(
-        sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
+        sorted(
+            path.relative_to(root).as_posix()
+            for path in root.rglob("*")
+            if path.is_file() and _is_versioned(path, root)
+        )
     )
 
 
