@@ -19,10 +19,10 @@ from pathlib import Path
 from agentic_validator.adapters.contract import check_against_contract
 from agentic_validator.adapters.reading import read_unit
 from agentic_validator.adapters.report import render_json, render_text
-from agentic_validator.adapters.repository import changed_paths, unit_roots
+from agentic_validator.adapters.repository import changed_paths, paths_in_last_commit, unit_roots
 from agentic_validator.domain.discovery import units_touched
 from agentic_validator.domain.findings import Report, RunReport, Verdict
-from agentic_validator.domain.snapshot import ValidatorError
+from agentic_validator.domain.snapshot import RepositoryUnreadableError, ValidatorError
 from agentic_validator.domain.rules import run_rules
 
 log = logging.getLogger(__name__)
@@ -93,16 +93,12 @@ def review_unit(root: Path, repository: str | None = None) -> Report:
 def review_changed_units(repository_root: Path, base: str, repository: str | None = None) -> RunReport:
     """Comprueba las unidades que el trabajo actual ha tocado respecto a `base`.
 
-    Cuando no hay con qué comparar, por ejemplo en el primer push de una rama, se comprueban todas las
-    unidades del repositorio: comprobar de más es molesto, pero callar es peligroso.
+    Cuando no hay con qué comparar, por ejemplo en el primer push de una rama, el alcance son los
+    archivos del último commit. El alcance del registro es lo que el autor tocó, nunca las demás
+    unidades del repositorio: comprobarlas le atribuiría hallazgos de código que no ha escrito.
     """
     roots = unit_roots(repository_root)
-    changed = changed_paths(repository_root, base)
-    if changed.unavailable is not None:
-        log.warning("no se pudo comparar con %s (%s); se comprueban todas las unidades", base, changed.unavailable)
-        touched = roots
-    else:
-        touched = units_touched(changed.paths, roots)
+    touched = units_touched(_paths_to_review(repository_root, base), roots)
     log.info("unidades a comprobar: %s", ", ".join(touched) or "ninguna")
     reports = tuple(review_unit(repository_root / unit, repository) for unit in touched)
     # `.name` de una ruta relativa como `.` es la cadena vacía, y el informe salía sin decir sobre
@@ -110,6 +106,26 @@ def review_changed_units(repository_root: Path, base: str, repository: str | Non
     name = repository_root.resolve().name
     unidades = "1 unidad tocada" if len(touched) == 1 else f"{len(touched)} unidades tocadas"
     return RunReport(scope=f"{name} ({unidades})", reports=reports)
+
+
+def _paths_to_review(repository_root: Path, base: str) -> tuple[str, ...]:
+    """Los archivos que el trabajo actual ha tocado, con o sin punto de comparación."""
+    changed = changed_paths(repository_root, base)
+    if changed.unavailable is None:
+        return changed.paths
+    log.warning(
+        "no se pudo comparar con %s (%s); el alcance son los archivos del último commit",
+        base,
+        changed.unavailable,
+    )
+    last = paths_in_last_commit(repository_root)
+    if last.unavailable is None:
+        return last.paths
+    # Aquí no es que falte el punto de comparación: es que git no responde. Callar dejaría pasar el
+    # cambio sin comprobar nada y sin que nadie se entere.
+    raise RepositoryUnreadableError(
+        f"no se pudo determinar qué se cambió: {changed.unavailable}; y tampoco el último commit: {last.unavailable}"
+    )
 
 
 def _run(args: argparse.Namespace) -> RunReport:

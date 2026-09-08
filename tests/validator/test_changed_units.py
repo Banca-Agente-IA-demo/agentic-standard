@@ -74,11 +74,38 @@ def test_un_cambio_fuera_de_toda_unidad_no_comprueba_nada_y_termina_en_verde(tmp
     assert run.reports == () and run.verdict is Verdict.COMPLIANT
 
 
-def test_sin_referencia_con_la_que_comparar_se_comprueban_todas(tmp_path):
-    # Comprobar de más es molesto; callar es peligroso.
+def test_sin_referencia_con_la_que_comparar_el_alcance_es_el_ultimo_commit(tmp_path):
+    """El alcance del registro es lo que el autor tocó, nunca las demás unidades del repositorio.
+
+    Antes, sin punto de comparación se comprobaban todas, y en el primer push de una rama eso le
+    atribuía al autor los hallazgos de código que no había escrito. La unidad rota de este
+    repositorio no está en el último commit, así que no debe aparecer.
+    """
     root = _domain_repository(tmp_path)
+    _git(root, "switch", "-q", "-c", "feat/algo")
+    add_skill(root / "plugins" / "demo-unit")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "toca sólo la sana")
     run = review_changed_units(root, "origin/no-existe")
-    assert sorted(informe.unit for informe in run.reports) == ["demo-unit", "dos"]
+    assert [informe.unit for informe in run.reports] == ["demo-unit"]
+
+
+def test_sin_referencia_y_con_un_commit_que_no_toca_ninguna_unidad_no_se_comprueba_nada(tmp_path):
+    root = _domain_repository(tmp_path)
+    _git(root, "switch", "-q", "-c", "feat/docs")
+    (root / "README.md").write_text("documentación\n", encoding="utf-8")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "sólo documentación")
+    run = review_changed_units(root, "origin/no-existe")
+    assert run.reports == () and run.verdict is Verdict.COMPLIANT
+
+
+def test_si_tampoco_se_puede_leer_el_ultimo_commit_se_dice_en_vez_de_callar(tmp_path):
+    # Sin punto de comparación y sin commit no falta una referencia: es que git no responde. Dejar
+    # pasar el cambio sin comprobar nada y sin que nadie se entere sería lo peligroso.
+    vacio = tmp_path / "sin-repositorio"
+    vacio.mkdir()
+    assert main([str(vacio), "--changed-since", "main"]) == Verdict.UNREADABLE.exit_code
 
 
 def test_el_comando_en_modo_descubrimiento_devuelve_cero_y_lo_dice(tmp_path, capsys):
