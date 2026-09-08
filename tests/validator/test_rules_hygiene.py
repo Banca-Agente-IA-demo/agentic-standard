@@ -119,3 +119,16 @@ def test_un_archivo_fuera_de_una_carpeta_de_apoyo_no_se_juzga_como_huerfano():
     # mencione sería un aviso imposible de atender.
     snap = snapshot(files=("skills/demo/SKILL.md", "GOVERNANCE.json", ".claude-plugin/plugin.json"))
     assert _rules(snap) == []
+
+
+def test_un_modulo_que_otro_script_importa_no_es_huerfano():
+    # Medido sobre el asistente de autoría: `_entry.py` lo importan los tres puntos de entrada, pero
+    # el texto del import no contiene la extensión, así que la regla lo avisaba como peso muerto.
+    snap = snapshot(
+        files=("skills/demo/SKILL.md", "skills/demo/scripts/_entry.py", "skills/demo/scripts/estado.py"),
+        text_contents={
+            "skills/demo/SKILL.md": "Ejecuta `scripts/estado.py`.\n",
+            "skills/demo/scripts/estado.py": "from _entry import emit\n",
+        },
+    )
+    assert _rules(snap) == []

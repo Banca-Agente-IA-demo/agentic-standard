@@ -105,3 +105,18 @@ def test_una_credencial_en_claro_en_una_unidad_real_se_detecta(tmp_path):
     assert "mcp.literal-secret" in rules
     assert "mcp.credential-unused" in rules
     assert CREDENTIAL in str(findings)
+
+
+def test_lo_que_la_unidad_no_versiona_no_se_juzga(tmp_path):
+    """Medido al validar el asistente de autoría en la máquina del autor.
+
+    Los archivos compilados que deja el intérprete daban un aviso de huérfano que en CI no salía,
+    porque allí ese directorio no existe. Un validador que responde distinto según dónde se ejecute
+    no sirve de gate.
+    """
+    root = build_unit(tmp_path)
+    compiled = root / "skills" / "demo-skill" / "scripts" / "__pycache__"
+    compiled.mkdir(parents=True)
+    (compiled / "ayuda.cpython-313.pyc").write_bytes(b"\x00binario\x00")
+    (compiled / "resto.py").write_text("# tampoco este\n", encoding="utf-8")
+    assert review_unit(root).findings == ()
