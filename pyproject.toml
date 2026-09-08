@@ -25,5 +25,6 @@ where = ["tools"]
 smoke_org = ["environments/*.json"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+# El plugin del asistente trae sus propias pruebas y viajan con la unidad, como exige el estándar.
+testpaths = ["tests", "plugins/authoring-assistant/tests"]
 markers = ["slow: construye la distribución del validador; tarda unos segundos"]
