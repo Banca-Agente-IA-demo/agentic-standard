@@ -15,6 +15,18 @@ import subprocess
 from pathlib import Path
 
 UNIT = "demo-unidad"
+GOVERNANCE_FILE = "GOVERNANCE.json"
+PUBLISHED_SKILL = "demo-skill"
+GOVERNANCE = {
+    "schema_version": "1.0",
+    "id": f"repo-prueba/{UNIT}",
+    "owner": {"team": "equipo-demo", "contact": "demo@example.com"},
+    "data_classification": "internal",
+    "risk_level": "low",
+    "permissions": {"tools": [], "commands": [], "mcp_servers": []},
+    "external_content": "no",
+    "x_extensions": {},
+}
 SCENARIOS = (
     "main_clean",
     "work_branch_clean",
@@ -44,6 +56,17 @@ def make_repository(base: Path, *, unit: str = UNIT) -> Path:
         json.dumps({"name": unit, "version": "0.1.0-beta.1"}, ensure_ascii=False), encoding="utf-8"
     )
     (root / "README.md").write_text("repositorio de prueba\n", encoding="utf-8")
+    # Una unidad publicada ya trae un artefacto: sin él no se puede probar qué pasa al retirarlo.
+    skill = manifest.parent / "skills" / PUBLISHED_SKILL
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        f"---\nname: {PUBLISHED_SKILL}\ndescription: el artefacto que la unidad ya ofrecía\n---\n\nCuerpo.\n",
+        encoding="utf-8",
+    )
+    # Una unidad de verdad declara su gobierno, y la clasificación del diff mira sus claves.
+    (manifest.parent / GOVERNANCE_FILE).write_text(
+        json.dumps(GOVERNANCE, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True, capture_output=True)
     git(root, "config", "user.email", "prueba@example.com")
