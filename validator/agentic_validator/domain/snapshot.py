@@ -18,6 +18,10 @@ class UnitNotFoundError(ValidatorError):
     """La carpeta indicada no existe o no es una unidad publicable."""
 
 
+class RepositoryUnreadableError(ValidatorError):
+    """No se pudo averiguar qué cambió: ni contra la base, ni en el último commit."""
+
+
 @dataclass(frozen=True)
 class TextArtifact:
     """Un skill, un agente o un prompt: lo que el cliente lee de su frontmatter."""

@@ -19,6 +19,9 @@ log = logging.getLogger(__name__)
 # cambiado yo»: no le atribuye lo que otros hayan metido en la rama base mientras trabajaba.
 _MERGE_BASE_RANGE = "{base}...HEAD"
 _GIT_TIMEOUT_SECONDS = 60
+# Los archivos del último commit, sin cabecera y sin el diff. Es el alcance del primer push de una
+# rama, cuando todavía no hay con qué comparar.
+_LAST_COMMIT_FILES = ["show", "--name-only", "--pretty=format:", "HEAD"]
 
 
 @dataclass(frozen=True)
@@ -35,7 +38,22 @@ class ChangedPaths:
 
 def changed_paths(repository: Path, base: str, runner=subprocess.run) -> ChangedPaths:
     """Rutas relativas que cambiaron entre el ancestro común con `base` y el estado actual."""
-    command = ["git", "-C", str(repository), "diff", "--name-only", _MERGE_BASE_RANGE.format(base=base)]
+    return _ask_git(
+        repository, ["diff", "--name-only", _MERGE_BASE_RANGE.format(base=base)], runner
+    )
+
+
+def paths_in_last_commit(repository: Path, runner=subprocess.run) -> ChangedPaths:
+    """Rutas relativas de los archivos del último commit.
+
+    Es el alcance cuando no hay punto de comparación: lo que el autor acaba de traer, que es lo único
+    que se le puede atribuir.
+    """
+    return _ask_git(repository, _LAST_COMMIT_FILES, runner)
+
+
+def _ask_git(repository: Path, arguments: list[str], runner) -> ChangedPaths:
+    command = ["git", "-C", str(repository), *arguments]
     try:
         completed = runner(
             command, capture_output=True, text=True, encoding="utf-8", check=False, timeout=_GIT_TIMEOUT_SECONDS

@@ -58,8 +58,9 @@ el resultado es verde y no menciona la rota.
 2. **Given** un push que toca un archivo que no pertenece a ninguna unidad, **When** se descubren,
    **Then** no aparece ninguna.
 3. **Given** el primer push de una rama nueva, cuando no hay un punto de comparación anterior,
-   **When** se descubren, **Then** se comprueban todas las unidades del repositorio, porque no se
-   puede saber qué cambió y callar sería peor que comprobar de más.
+   **When** se descubren, **Then** se comprueban sólo las unidades que contienen archivos del último
+   commit, porque el alcance del registro es lo que el autor tocó y nunca las demás unidades del
+   repositorio.
 4. **Given** un push que borra una unidad entera, **When** se descubren, **Then** esa unidad no
    aparece, porque ya no hay nada que juzgar.
 
@@ -132,8 +133,9 @@ sólo el disparador, los permisos y la referencia.
 - **FR-004**: El nombre de la comprobación que aparece en la interfaz MUST ser el que fija el diseño.
 - **FR-005**: El registro MUST descubrir las unidades que el push toca comparando con el estado
   anterior, y MUST comprobar sólo ésas.
-- **FR-006**: Cuando no haya estado anterior con el que comparar, el registro MUST comprobar todas las
-  unidades del repositorio.
+- **FR-006**: Cuando no haya estado anterior con el que comparar, el registro MUST comprobar sólo las
+  unidades que contienen archivos del último commit, y MUST NOT comprobar las demás. Si tampoco se
+  puede leer el último commit, MUST decirlo y terminar como no comprobable.
 - **FR-007**: El registro MUST instalar el validador desde el mismo commit del estándar del que
   procede el workflow, sin que nadie declare una versión a mano.
 - **FR-008**: El registro MUST admitir una credencial opcional de lectura sobre el estándar, para
@@ -188,6 +190,10 @@ sólo el disparador, los permisos y la referencia.
 - Q: ¿El descubrimiento de unidades va en el workflow o en un programa aparte? → A: en un programa con
   pruebas. Un guion incrustado no se puede probar y esta es justo la clase de lógica que se rompe en
   silencio.
-- Q: ¿Qué pasa en el primer push de una rama, cuando no hay con qué comparar? → A: se comprueban todas
-  las unidades. Comprobar de más es molesto; callar es peligroso.
+- Q: ¿Qué pasa en el primer push de una rama, cuando no hay con qué comparar? → A: el alcance son los
+  archivos del último commit. **Corregido el 8 de septiembre de 2026**: la primera respuesta fue
+  comprobar todas las unidades, con el argumento de que callar es peor que comprobar de más. Es la
+  disyuntiva equivocada: comprobar de más le atribuye al autor los hallazgos de código que no ha
+  escrito, y hay un tercer camino que no calla, que es el último commit. Si tampoco se puede leer, eso
+  ya no es que falte una referencia, sino que git no responde, y entonces sí se dice y no se juzga.
 - Q: ¿El registro puede fusionar o etiquetar? → A: no. Es sólo una comprobación y no escribe nada.
