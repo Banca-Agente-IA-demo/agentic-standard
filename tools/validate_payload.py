@@ -29,6 +29,7 @@ from pydantic import ValidationError
 
 from port_catalog.client import PortClient
 from port_catalog.errors import CatalogError
+from port_catalog.team_lookup import resolve_team_slug
 from port_catalog.unit_lookup import is_name_taken
 from unit_seed.errors import SeedError
 from unit_seed.unit_request import UnitRequest
@@ -90,7 +91,12 @@ def main() -> None:
         return
 
     try:
-        taken = is_name_taken(PortClient.from_environment(), request.name)
+        client = PortClient.from_environment()
+        # El formulario envía el id numérico del equipo de GitHub; el manifiesto necesita el slug.
+        # Se traduce ANTES de la comprobación de nombre para que las dos consultas compartan token.
+        request = request.model_copy(
+            update={"owner_team": resolve_team_slug(client, request.owner_team)})
+        taken = is_name_taken(client, request.name)
     except CatalogError as exc:
         # No se pudo comprobar, que no es lo mismo que «está ocupado». Seguir como si estuviera libre
         # dejaría publicar una colisión; decir que está ocupado culparía al autor de un fallo nuestro.
