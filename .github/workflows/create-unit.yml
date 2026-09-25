@@ -83,7 +83,9 @@ jobs:
 
       - name: Comprobar la forma del payload y que el nombre esté libre
         id: check
-        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/validate-payload@v1
+        # Las tres actions de este repositorio apuntan a la RAMA mientras se prueba, porque la
+        # etiqueta `v1` existe desde antes y no las contiene. Vuelven a `@v1` al fusionar.
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/validate-payload@feat/create-unit-self-service
         with:
           payload-file: ${{ runner.temp }}/payload.json
 
@@ -100,7 +102,7 @@ jobs:
     steps:
       - name: Devolver el motivo a quien rellenó el formulario
         if: inputs.port_run_id != ''
-        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@v1
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@feat/create-unit-self-service
         with:
           run-id: ${{ inputs.port_run_id }}
           status: FAILURE
@@ -153,7 +155,7 @@ jobs:
 
       - name: Sembrar el esqueleto desde las plantillas del estándar
         id: seed
-        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/seed-unit@v1
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/seed-unit@feat/create-unit-self-service
         with:
           payload-file: ${{ runner.temp }}/payload.json
           root: .
@@ -172,7 +174,7 @@ jobs:
 
       - name: Devolver el resultado a quien rellenó el formulario
         if: inputs.port_run_id != ''
-        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@v1
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@feat/create-unit-self-service
         with:
           run-id: ${{ inputs.port_run_id }}
           status: SUCCESS
