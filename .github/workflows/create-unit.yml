@@ -172,17 +172,48 @@ jobs:
           git commit -m "feat($UNIT_NAME): esqueleto sembrado desde el autoservicio de Port"
           git push --set-upstream origin "$BRANCH"
 
+      - name: Anotar el commit sembrado
+        # Es la clave de cruce entre el catálogo y el repositorio, y se resuelve DESPUÉS del push,
+        # que es cuando ese commit existe en el remoto.
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Registrar la unidad en el catálogo, en estado Desarrollo
+        id: register
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/register-unit@feat/create-unit-self-service
+        with:
+          payload-file: ${{ runner.temp }}/payload.json
+          sha: ${{ steps.commit.outputs.sha }}
+
+      - name: Retirar la rama si el nombre ya tenía ficha
+        # Es el único caso en que la rama sobra y el fallo no es nuestro: dos autores fueron con el
+        # mismo nombre y el segundo llegó tarde. La comprobación previa reduce esa ventana, no la
+        # elimina, porque la ficha nace al final.
+        if: steps.register.outputs.name-taken == 'true'
+        env:
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: git push origin --delete "$BRANCH"
+
+      - name: Devolver el motivo cuando el nombre ya estaba tomado
+        if: steps.register.outputs.name-taken == 'true' && inputs.port_run_id != ''
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@feat/create-unit-self-service
+        with:
+          run-id: ${{ inputs.port_run_id }}
+          status: FAILURE
+          summary: ${{ steps.register.outputs.reason }}
+
       - name: Devolver el resultado a quien rellenó el formulario
-        if: inputs.port_run_id != ''
+        if: steps.register.outputs.name-taken != 'true' && inputs.port_run_id != ''
         uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@feat/create-unit-self-service
         with:
           run-id: ${{ inputs.port_run_id }}
           status: SUCCESS
-          summary: "La unidad ${{ needs.validate-payload.outputs.unit-name }} se sembro en la rama ${{ steps.branch.outputs.name }}."
+          summary: "La unidad ${{ needs.validate-payload.outputs.unit-name }} se sembro en la rama ${{ steps.branch.outputs.name }} y quedo registrada en estado Desarrollo."
 
       - name: Retirar la rama si algo falló después de publicarla
-        # O existen la rama y su aviso, o no existe ninguna de las dos. Una rama sin nada que la
-        # explique es indistinguible de una unidad abandonada.
+        # O existen la rama y la ficha, o no existe ninguna de las dos. Una rama sin ficha es
+        # indistinguible de una unidad abandonada, y una ficha sin rama promete un código que no
+        # está.
         if: failure()
         env:
           BRANCH: ${{ steps.branch.outputs.name }}

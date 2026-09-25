@@ -54,8 +54,14 @@ class PortClient:
     def get(self, path: str) -> dict:
         return self._request("GET", path)
 
+    def post(self, path: str, body: dict) -> dict:
+        return self._request("POST", path, body)
+
     def patch(self, path: str, body: dict) -> dict:
         return self._request("PATCH", path, body)
+
+    def delete(self, path: str) -> dict:
+        return self._request("DELETE", path)
 
     def exists(self, path: str) -> bool:
         """Si el recurso existe. Un 404 es una respuesta, no un fallo."""
@@ -71,11 +77,15 @@ class PortClient:
         return _call(method, path, self._authorization(), body)
 
     def _authorization(self) -> str:
-        if self._token is None:
-            answer = _call("POST", "/auth/access_token", None,
-                           {"clientId": self._client_id, "clientSecret": self._client_secret})
-            self._token = answer["accessToken"]
-        return self._token
+        if self._token is not None:
+            return self._token
+        answer = _call("POST", "/auth/access_token", None,
+                       {"clientId": self._client_id, "clientSecret": self._client_secret})
+        token = answer.get("accessToken")
+        if not isinstance(token, str) or not token:
+            raise CatalogUnavailableError("Port no devolvió un token utilizable")
+        self._token = token
+        return token
 
 
 def _call(method: str, path: str, token: str | None, body: dict | None) -> dict:

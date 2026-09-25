@@ -9,7 +9,8 @@ Trazabilidad. AGENTS.md X1 y P2.
 
 from __future__ import annotations
 
-__all__ = ["CatalogError", "CredentialsMissingError", "CatalogUnavailableError", "RunExhaustedError"]
+__all__ = ["CatalogError", "CredentialsMissingError", "CatalogUnavailableError", "RunExhaustedError",
+           "UnitAlreadyRegisteredError"]
 
 
 class CatalogError(Exception):
@@ -22,6 +23,15 @@ class CredentialsMissingError(CatalogError):
 
 class CatalogUnavailableError(CatalogError):
     """Port contestó algo que no se puede usar, o no contestó."""
+
+
+class UnitAlreadyRegisteredError(CatalogError):
+    """El nombre de la unidad ya tiene ficha en el catálogo.
+
+    Es una respuesta y no una avería: la ficha se crea con una operación que falla si el
+    identificador existe, en vez de con una que actualiza, porque actualizar convertiría un choque de
+    nombres en el borrado silencioso de la ficha ajena.
+    """
 
 
 class RunExhaustedError(CatalogError):
