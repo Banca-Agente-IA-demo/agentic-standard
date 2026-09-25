@@ -50,6 +50,46 @@ _NUMBERED_FIELDS = {
 }
 
 
+def _flatten_entity_fields(payload: dict) -> dict:
+    """Convierte en cadena los campos que Port envía como entidad entera.
+
+    Medido el 25 de septiembre de 2026 en la primera ejecución real: un campo con `format: entity`
+    NO llega como el identificador, llega como el objeto completo.
+
+        owner_team -> {"identifier": "19716830", "title": "squad-cnf-migration",
+                       "blueprint": "githubTeam", "properties": {"slug": "squad-cnf-migration", ...}}
+        repository -> {"identifier": "Banca-Agente-IA-demo/agents-modernization", ...}
+
+    De ahí salen dos cosas. Del equipo se toma el **slug**, porque el identificador es el id numérico
+    de GitHub y un manifiesto que dijera `"author": {"name": "19716830"}` no serviría para avisar a
+    nadie. Del repositorio se toma el **identificador**, que ya es `organizacion/repositorio`.
+    """
+    flattened = dict(payload)
+    for field, prefer_slug in (("owner_team", True), ("repository", False)):
+        value = flattened.get(field)
+        if not isinstance(value, dict):
+            continue
+        if prefer_slug:
+            slug = value.get("properties", {}).get("slug") or value.get("title")
+            flattened[field] = slug or value.get("identifier", "")
+        else:
+            flattened[field] = value.get("identifier", "")
+    return flattened
+
+
+def _collapse_numbered_fields(payload: dict) -> dict:
+    """Convierte `skill_1`, `skill_2`, ... en la lista `skills`, y lo mismo con los otros tres."""
+    collapsed = dict(payload)
+    for target, (prefix, _) in _NUMBERED_FIELDS.items():
+        if target in collapsed:
+            continue
+        names = [collapsed.get("%s_%d" % (prefix, position))
+                 for position in range(1, MAX_ARTIFACTS_PER_TYPE + 1)]
+        collapsed[target] = tuple(str(name).strip() for name in names
+                                  if name is not None and str(name).strip())
+    return collapsed
+
+
 class UnitRequest(BaseModel):
     """Lo que el formulario recogió. Nada aquí se deriva: todo lo tecleó o lo eligió una persona."""
 
@@ -72,19 +112,15 @@ class UnitRequest(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _collapse_numbered_fields(cls, payload: object) -> object:
-        """Convierte `skill_1`, `skill_2`, ... en la lista `skills`, y lo mismo con los otros tres."""
+    def _normalize_port_shape(cls, payload: object) -> object:
+        """Adapta lo que envía el formulario a la forma del dominio.
+
+        Son dos diferencias de forma, las dos del lado de Port, y las dos se resuelven aquí porque
+        esta es la frontera: hacia dentro ya viaja la forma de dominio.
+        """
         if not isinstance(payload, dict):
             return payload
-        collapsed = dict(payload)
-        for target, (prefix, _) in _NUMBERED_FIELDS.items():
-            if target in collapsed:
-                continue
-            names = [collapsed.get(f"{prefix}_{position}")
-                     for position in range(1, MAX_ARTIFACTS_PER_TYPE + 1)]
-            collapsed[target] = tuple(str(name).strip() for name in names
-                                      if name is not None and str(name).strip())
-        return collapsed
+        return _collapse_numbered_fields(_flatten_entity_fields(payload))
 
     @model_validator(mode="after")
     def _check_artifact_names(self) -> UnitRequest:

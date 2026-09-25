@@ -29,6 +29,40 @@ GROUPED_PAYLOAD = {
 }
 
 
+def test_un_campo_de_entidad_llega_como_objeto_y_no_como_cadena() -> None:
+    # Medido el 25 de septiembre de 2026 en la primera ejecución real del formulario: un campo con
+    # `format: entity` NO llega como el identificador, llega como la entidad entera, y la validación
+    # reventaba con «Input should be a valid string». Del equipo se toma el slug, porque el
+    # identificador es el id numérico de GitHub; del repositorio, el identificador, que ya es
+    # `organizacion/repositorio`.
+    payload = {
+        **GROUPED_PAYLOAD,
+        "owner_team": {
+            "identifier": "19716830",
+            "title": "squad-cnf-migration",
+            "blueprint": "githubTeam",
+            "properties": {"slug": "squad-cnf-migration"},
+        },
+        "repository": {
+            "identifier": "Banca-Agente-IA-demo/agents-modernization",
+            "title": "agents-modernization",
+            "blueprint": "githubRepository",
+            "properties": {"defaultBranch": "main"},
+        },
+    }
+    request = UnitRequest.model_validate(payload)
+    assert request.owner_team == "squad-cnf-migration"
+    assert request.repository == "Banca-Agente-IA-demo/agents-modernization"
+
+
+def test_un_equipo_sin_slug_cae_en_su_titulo_antes_que_en_el_id_numerico() -> None:
+    # El id numérico es lo último que se usa: un manifiesto que dijera `"name": "19716830"` no
+    # serviría para avisar a nadie, que es para lo que existe el campo.
+    payload = {**GROUPED_PAYLOAD,
+               "owner_team": {"identifier": "19716830", "title": "squad-cnf-migration"}}
+    assert UnitRequest.model_validate(payload).owner_team == "squad-cnf-migration"
+
+
 def test_los_campos_numerados_del_formulario_se_colapsan_en_listas() -> None:
     # Port no ofrece un campo repetible, así que la acción declara skill_1, skill_2, ... y la
     # frontera es el sitio donde esa forma de formulario se convierte en la forma de dominio.
