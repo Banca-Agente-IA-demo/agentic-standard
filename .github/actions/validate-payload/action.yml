@@ -1,0 +1,66 @@
+# Comprueba si el formulario de Port describe una unidad que se puede sembrar.
+#
+# ES UNA COMPOSITE ACTION por el mismo motivo medido que `validate` y `seed-unit`: un reutilizable no
+# puede leer archivos de su propio repositorio, y la credencial por defecto no alcanza el estándar
+# cuando es privado. La action llega con el árbol dentro, así que el validador del payload sale de
+# ese mismo árbol y es EL MISMO CÓDIGO que después usa el sembrador.
+#
+# NO FALLA CUANDO EL PAYLOAD ES INVÁLIDO: devuelve `status=false` y un motivo. Falla solo cuando NO
+# PUDO comprobar, que no es lo mismo y no se le puede reprochar a quien rellenó el formulario.
+name: validate-payload
+description: Valida la forma del payload de Port y comprueba que el nombre de la unidad esté libre.
+
+inputs:
+  payload-file:
+    description: Archivo JSON con el formulario que envió Port.
+    required: true
+
+outputs:
+  status:
+    description: "true si la unidad se puede sembrar; false si no."
+    value: ${{ steps.check.outputs.status }}
+  reason:
+    description: El motivo legible cuando status es false. Vacío cuando es true.
+    value: ${{ steps.check.outputs.reason }}
+  unit-name:
+    description: El nombre de la unidad, ya validado.
+    value: ${{ steps.check.outputs.unit_name }}
+  normalized-payload:
+    description: El payload con los campos numerados del formulario colapsados en listas.
+    value: ${{ steps.check.outputs.normalized_payload }}
+
+runs:
+  using: composite
+  steps:
+    - name: Instalar la versión de Python que el estándar declara
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version-file: ${{ github.action_path }}/../../../.python-version
+
+    - name: Instalar las herramientas desde el árbol del estándar que trae esta action
+      shell: bash
+      run: |
+        set -euo pipefail
+        python -m pip install --quiet "${{ github.action_path }}/../../.."
+
+    - name: Comprobar la forma del payload y la unicidad del nombre
+      id: check
+      shell: bash
+      env:
+        PAYLOAD_FILE: ${{ inputs.payload-file }}
+        STANDARD_TREE: ${{ github.action_path }}/../../..
+      run: |
+        set -euo pipefail
+        # El veredicto sale por stdout como un solo JSON y el diagnóstico por stderr, así que llega
+        # limpio aunque el comprobador informe de cada paso.
+        VERDICT="$(python "$STANDARD_TREE/tools/validate_payload.py" --payload "$PAYLOAD_FILE")"
+        # Cada clave se emite por separado porque un output de GitHub es una cadena plana: quien lo
+        # consume no debería tener que parsear un JSON para leer un booleano.
+        python - "$VERDICT" <<'PY' >> "$GITHUB_OUTPUT"
+        import json, sys
+        verdict = json.loads(sys.argv[1])
+        print("status=%s" % str(verdict["status"]).lower())
+        print("reason=%s" % " ".join(verdict["reason"].split()))
+        print("unit_name=%s" % verdict["unit_name"])
+        print("normalized_payload=%s" % json.dumps(verdict["normalized_payload"]))
+        PY

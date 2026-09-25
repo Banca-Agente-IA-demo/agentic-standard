@@ -2,14 +2,16 @@
 name: <<NAME>>
 description: "<<DESCRIPTION>>"
 argument-hint: "<<ARGUMENTS>>"
-metadata:
-  tags: <<TAGS>>
 ---
 
 <!--
   DÓNDE VA: `commands/<<NAME>>.prompt.md`. El nombre del archivo sin `.prompt.md` coincide con `name`.
 
-  EL FRONTMATTER SÓLO LLEVA LO QUE EL CLIENTE LEE más `metadata:` de catálogo. Nada de gobierno.
+  EL NOMBRE ADMITE PUNTOS, con el mismo criterio que el agente: `atla.cnf-migration.analyze`.
+
+  EL FRONTMATTER SÓLO LLEVA LOS CAMPOS QUE 02 §6 DECLARA: `name`, `description`, y si aplica
+  `argument-hint` y `agent`. NO lleva `metadata:`; las etiquetas de catálogo viven en `keywords` del
+  plugin.json de la unidad. Nada de gobierno. `model` está prohibido.
 
   UN PROMPT ES UN PUNTO DE ENTRADA que una persona invoca a mano, a diferencia de un skill, que el
   modelo decide cargar. Regla de desistimiento: ante la duda entre prompt y skill, elige skill. La

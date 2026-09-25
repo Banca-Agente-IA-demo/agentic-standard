@@ -4,8 +4,9 @@
   "title": "GOVERNANCE.json: las decisiones humanas de gobierno de una unidad publicable",
   "description": "Contrato del archivo GOVERNANCE.json que lleva toda unidad publicable, sea plugin o artefacto individual, en su raíz junto a .claude-plugin/plugin.json. Declara sólo lo que ningún hecho puede derivar: dueño, clasificación, riesgo elevado, permisos, tratamiento de contenido externo, gobierno del servidor MCP y obsolescencia. Lo que ya está en plugin.json (identidad, versión), en el árbol (inventario), en la solicitud de cambio (aprobadores), en el check run (veredicto), en la atestación (sello) o en Port (estado, fecha de revisión, versión del estándar) NO se repite aquí. Ningún cliente lo lee; lo leen la automatización de agentic-standard y Port. Fuente: lineamiento 04 §3 y decisiones D1 a D6 de REVISION-ESQUEMAS-HITO-1.md (7 de septiembre de 2026).",
   "type": "object",
+  "$comment": "Esquema CERRADO: additionalProperties es false sin excepciones. El campo x_extensions se retiro el 16 de septiembre de 2026. Era una valvula de escape sin validacion para que el autor documentara a mano lo que el estandar no cubre, y era el campo mas inerte del archivo: nada lo validaba, nada lo leia y nada derivaba de el. Su uso previsto, declarar lo que no es portable, no necesita un campo: si rules puede detectar headersHelper, oauth o ws en el .mcp.json para exigir la declaracion, entonces ya lo sabe, y copiarlo a mano solo anade un sitio que puede discrepar. Lo no portable se DERIVA del artefacto y se muestra en Port. Una necesidad no prevista se resuelve cambiando el estandar, no metiendola en una bolsa sin validar.",
   "additionalProperties": false,
-  "required": ["schema_version", "id", "owner", "data_classification", "permissions"],
+  "required": ["schema_version", "id", "owner", "risk_level", "data_classification", "permissions"],
   "properties": {
     "schema_version": {
       "type": "string",
@@ -43,7 +44,7 @@
     "risk_level": {
       "type": "string",
       "enum": ["low", "medium", "high"],
-      "description": "OPCIONAL y sólo para ELEVAR. El mínimo lo calcula rules a partir de hechos: servidor MCP con write_operations, credenciales declaradas, presencia de hooks/hooks.json, clasificación confidential o restricted. Si el campo está y es inferior al mínimo calculado, falla. Condiciona quién más aprueba y cuánto dura la aprobación (03 §1, C8)."
+      "description": "OBLIGATORIO desde el 16 de septiembre de 2026, con uno de los tres valores. El autor elige de un menu y describe el impacto que atribuye a la unidad. NO deriva aprobadores ni plazos: quien aprueba lo determina el contenido del cambio (03 §1) y la caducidad es de 12 meses para toda unidad (03 §2, C8). Por que obligatorio y no opcional: un campo de catalogo que la mitad de las unidades no trae no se puede filtrar, asi que la pregunta cuantas unidades de riesgo alto tenemos no tendria respuesta, tendria una respuesta parcial que parece completa."
     },
     "permissions": {
       "type": "object",
@@ -88,8 +89,8 @@
     "deprecation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["superseded_by", "sunset_date", "decided_by"],
-      "description": "Anuncio de obsolescencia de la UNIDAD entera. Es la única transición de estado que decide una persona; el estado deprecated lo deriva la automatización de este bloque (02 §5). Entra en una versión de parche. Si el bloque existe, los tres campos son obligatorios.",
+      "required": ["superseded_by", "sunset_date"],
+      "description": "Anuncio de obsolescencia de la UNIDAD entera. Es la única transición de estado que decide una persona; el estado deprecated lo deriva la automatización de este bloque (02 §5). Entra en una versión de parche. Si el bloque existe, los dos campos son obligatorios. QUIEN decidio no se declara aqui: es un hecho que vive en la aprobacion de la solicitud de cambio, con quien y cuando. El campo decided_by se retiro el 16 de septiembre de 2026 por ser redundante con esa aprobacion y no verificable al escribirse.",
       "properties": {
         "superseded_by": {
           "type": "string",
@@ -99,66 +100,45 @@
         "sunset_date": {
           "type": "string",
           "format": "date",
-          "description": "Fecha ISO 8601 (AAAA-MM-DD) a partir de la cual la unidad pasa a retired. rules comprueba que no sea anterior a la fecha del anuncio."
-        },
-        "decided_by": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Quién decidió, normalmente el Lead Técnico de dominio, en forma @org/equipo."
+          "description": "Fecha ISO 8601 (AAAA-MM-DD) a partir de la cual la unidad pasa a retired. rules comprueba que no sea anterior a la fecha del anuncio MAS 60 DIAS: es el aviso minimo, porque quien ya instalo la unidad no recibe ninguna notificacion automatica y se entera cuando pregunta."
         }
       }
-    },
-    "x_extensions": {
-      "type": "object",
-      "description": "Válvula de escape visible para lo que el estándar no cubre todavía: por ejemplo hooks con eventos exclusivos de un cliente (04 §2). Sin validación de contenido. Todo lo demás del archivo rechaza claves desconocidas."
     }
   },
   "$defs": {
     "mcpServer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["write_operations", "credentials", "tools_digest"],
-      "description": "Las piezas de gobierno de un servidor MCP. La conexión (comando, URL, transporte) vive en .mcp.json y no se repite. La aprobación vive en la solicitud de cambio y su fecha de revisión en Port.",
+      "required": ["accountable_team", "tools_contract"],
+      "description": "Las piezas de gobierno de un servidor MCP, partidas por PROCEDENCIA: accountable_team es lo unico que teclea una persona, porque es conocimiento de la organizacion y no esta en ningun archivo; tools_contract es lo que la maquina observo, entero y con su fecha. La conexion (comando, URL, transporte, cabeceras) vive en .mcp.json y no se repite: el reloj de deriva pregunta exactamente como dice ese archivo, sustituyendo solo la credencial. QUE credenciales hacen falta tampoco se declara aqui: son los ${VAR} del propio .mcp.json, y rules los lee de ahi. El array credentials se retiro el 16 de septiembre de 2026 por repetir ese dato, y porque su regla de que una lista no vacia eleva el riesgo minimo contradecia que risk_level no derive nada.",
       "properties": {
-        "write_operations": {
-          "type": "boolean",
-          "description": "Si alguna herramienta del servidor modifica algo fuera del cliente. Es el indicador de riesgo que más pesa: true eleva el mínimo calculado."
+        "accountable_team": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Slug del equipo DEL BANCO que RESPONDE por que este servidor este aqui, nunca una persona. NO es el dueno del servidor: un servidor MCP externo es de quien lo opera (Atlassian, GitHub, AWS) y ningun equipo del banco lo posee. Lo que se declara es responsabilidad interna, no propiedad. Por eso NO se llama server_owner, que fue su nombre entre el 17 de septiembre de 2026 por la manana y esa misma tarde: ese nombre sugeria que existia un equipo del banco dueno del servidor, y hablar de dos duenos ya concedia lo que no es cierto. Tampoco es el owner de la unidad: quien publica no es quien avala la dependencia externa. OBLIGATORIO SIEMPRE, tenga o no credenciales el servidor. Si las pide, es ademas quien las concede, y sin el, el consumidor instala la unidad, el cliente le pide el token y no sabe a quien pedirselo. Si NO las pide, sigue haciendo falta: es quien avala que ese endpoint externo puede recibir datos del banco. Se hizo obligatorio porque pedir una credencial era en la practica la unica conversacion que obligaba a que alguien mirara el servidor, y un endpoint publico entraba sin que nadie lo avalara. NO se valida contra los equipos de GitHub: quien responde por un servicio puede no existir como equipo de GitHub. Se valida contra el registro de servidores de agentic-standard. La URL donde se solicita el acceso NO va aqui: es propiedad del equipo y no de la unidad, se repetiria en cada unidad que use el mismo servidor, y un release es inmutable mientras que una URL de ITSM no."
         },
-        "credentials": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
-          "description": "Nombres de las variables o cabeceras que el servidor necesita, NUNCA sus valores: JIRA_TOKEN. rules las contrasta con los ${VAR} de env y headers en .mcp.json: declarar cero y usar una es error, y al revés también. Una lista no vacía eleva el riesgo mínimo."
-        },
-        "credentials_owner": {
+        "tools_contract": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["team", "access_request_url"],
-          "description": "Quién concede el acceso y dónde se pide (D2). Obligatorio cuando credentials no está vacía: la unidad viaja sin el secreto, el cliente lo pide al instalar, y quien publica no es quien concede. Sin esto el flujo acaba en un correo a ciegas.",
+          "required": ["digest", "write_operations", "observed_at"],
+          "description": "Lo que el asistente OBSERVO al consultar tools/list del servidor, en un solo acto y en un solo instante. Es un bloque de maquina: el autor no teclea nada aqui, y la plantilla no lo emite. Los tres campos salen de la misma consulta, asi que no pueden desincronizarse entre si: si el servidor cambia sus herramientas, cambian el digest y la clasificacion a la vez, y un solo indicio de caducidad cubre los dos. Se agrupo asi el 17 de septiembre de 2026, porque write_operations suelto entre campos que teclea una persona PARECIA tecleable y la plantilla lo confirmaba dandole un valor por defecto. AVISO: nadie verifica hoy este bloque. El CI no se conecta a ningun servidor (no tiene credenciales, ver 11.17), asi que digest y clasificacion son declaraciones del asistente sin contrastar. observed_at existe para que el bloque afirme lo que de verdad puede afirmar, que es lo que el servidor exponia ESE DIA, y no prometa una vigilancia que todavia no hay. Migra a Port el dia que exista el reloj de deriva, y entonces se retira del manifiesto.",
           "properties": {
-            "team": {
+            "digest": {
               "type": "string",
-              "pattern": "^[a-z0-9][a-z0-9-]*$",
-              "description": "Slug del equipo custodio, nunca una persona."
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "description": "sha256 del contrato del servidor: nombres, descripciones y esquemas de entrada de sus herramientas, normalizados. AVISO, medido el 16 de septiembre de 2026: la lista de herramientas de un servidor DEPENDE DE COMO SE PREGUNTE. El servidor MCP de GitHub devolvio entre 6 y 99 herramientas y siete digests distintos con la misma credencial, segun ruta y cabeceras. Por eso el reloj tiene que preguntar exactamente como dice el .mcp.json de la unidad; comparar contra la configuracion por defecto daria falsos positivos desde el primer dia. El control C4 esta pendiente de rediseno con este dato."
             },
-            "access_request_url": {
+            "write_operations": {
+              "type": "boolean",
+              "description": "Si alguna herramienta del servidor modifica algo fuera del cliente. Lo DERIVA el asistente clasificando los nombres, descripciones y esquemas que devolvio tools/list, CON SESGO A true: la duda cuenta como escritura, porque los dos errores no cuestan lo mismo. Decir true de un servidor que solo lee sobra una aprobacion; decir false de uno que escribe deja que un servidor externo se salte la aprobacion, que es justo el fallo que el campo existe para evitar. NO se apoya en las annotations de la especificacion MCP: son opcionales (un servidor valido no las publica) y la propia especificacion obliga al cliente a tratarlas como no confiables salvo que vengan de un servidor de confianza, cosa que en la primera aprobacion todavia no es. Cuando el servidor las publique, sirven de refuerzo y no de fuente unica. Es ademas el campo que distingue el unico caso de servidor externo SIN autenticacion que se admite sin aprobacion explicita: solo lectura y sin recibir contenido del banco."
+            },
+            "observed_at": {
               "type": "string",
-              "format": "uri",
-              "description": "Dónde se solicita el acceso."
+              "format": "date",
+              "description": "Fecha ISO 8601 (AAAA-MM-DD) de la consulta al servidor. Sin ella el bloque afirmaria un hecho presente cuando solo puede afirmar una observacion pasada: un hash y un booleano sin fecha, sentados juntos, heredan una autoridad que no tienen, porque el lector asume que si hay un sha256 es que algo se comprobo."
             }
           }
-        },
-        "tools_digest": {
-          "type": "string",
-          "pattern": "^sha256:[0-9a-f]{64}$",
-          "description": "sha256 del contrato aprobado del servidor: nombres, descripciones y esquemas de entrada de sus herramientas, normalizados. Lo propone el asistente de autoría consultando al servidor; rules y check-mcp-drift lo comparan con lo que el servidor expone (C4). Un cambio externo del servidor suspende la unidad."
         }
-      },
-      "if": {
-        "properties": { "credentials": { "minItems": 1 } }
-      },
-      "then": {
-        "required": ["credentials_owner"]
       }
     }
   }

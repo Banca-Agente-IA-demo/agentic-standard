@@ -62,7 +62,12 @@ def build_unit(base: Path, *, with_mcp: bool = False, with_hooks: bool = False) 
     if with_mcp:
         block = json.loads(instantiate(read_template("artifacts/mcp/mcp-governance-block.json")))
         governance["permissions"] = {**governance["permissions"], "mcp_servers": [SERVER]}
-        governance["mcp"] = block["mcp"]
+        # La plantilla trae sólo lo que teclea una persona. `tools_contract` lo escribe el asistente
+        # tras consultar al servidor, así que aquí se simula ese paso: sin él la unidad no valida.
+        governance["mcp"] = {
+            server: {**entrada, "tools_contract": OBSERVED_TOOLS_CONTRACT}
+            for server, entrada in block["mcp"].items()
+        }
         (root / ".mcp.json").write_text(instantiate(read_template("artifacts/mcp/.mcp.json")), encoding="utf-8")
     if with_hooks:
         governance["permissions"] = {**governance["permissions"], "commands": ["check.sh"]}
@@ -137,7 +142,6 @@ VALID_GOVERNANCE = {
     "external_content": "No procesa contenido externo.",
 }
 VALID_MANIFEST = {
-    "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
     "name": UNIT_NAME,
     "version": "0.1.0-beta.1",
     "description": "Unidad de prueba.",
@@ -175,14 +179,14 @@ MCP_CONNECTION = {
         SERVER: {"type": "http", "url": "https://jira.example/mcp", "headers": {"Authorization": f"Bearer ${{{CREDENTIAL}}}"}}
     }
 }
-MCP_GOVERNANCE_BLOCK = {
-    SERVER: {
-        "write_operations": False,
-        "credentials": [CREDENTIAL],
-        "credentials_owner": {"team": "plataforma-atlassian", "access_request_url": "https://example/accesos"},
-        "tools_digest": "sha256:" + "0" * 64,
-    }
+# Lo que el asistente observa en `tools/list` y escribe entero. No es un marcador de plantilla:
+# ninguna persona lo teclea, y por eso la plantilla no lo emite.
+OBSERVED_TOOLS_CONTRACT = {
+    "digest": "sha256:" + "0" * 64,
+    "write_operations": False,
+    "observed_at": "2026-09-17",
 }
+MCP_GOVERNANCE_BLOCK = {SERVER: {"accountable_team": "platform-atlassian", "tools_contract": OBSERVED_TOOLS_CONTRACT}}
 
 
 def mcp_governance() -> dict:

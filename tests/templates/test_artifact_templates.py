@@ -110,9 +110,9 @@ def test_cada_accion_de_la_plantilla_de_hooks_declara_tope_de_tiempo():
         assert "timeout" in action, event
 
 
-def test_el_campo_de_tope_inventado_por_la_demo_no_aparece():
-    # `timeoutSec` no existe en el formato; la demo lo aceptaba «durante la migración» y aquí es error
-    # desde el primer día porque la organización nace limpia.
+def test_la_plantilla_no_usa_el_nombre_del_tope_que_solo_entiende_copilot():
+    # `timeoutSec` es el nombre canónico del tope en Copilot; Claude Code sólo conoce `timeout`. La
+    # plantilla escribe el portable, o la acción se quedaría sin tope en un cliente.
     for event, action in _hook_actions():
         assert "timeoutSec" not in action, event
 

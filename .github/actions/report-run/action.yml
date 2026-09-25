@@ -1,0 +1,46 @@
+# Devuelve a Port el resultado de la ejecución y su motivo legible.
+#
+# QUÉ ES UNA EJECUCIÓN Y QUÉ NO: es el registro de «alguien pulsó el formulario y esto pasó». NO es
+# la ficha de la unidad, que cuando la validación falla no llega a existir.
+#
+# MEDIDO el 24 de septiembre de 2026: una ejecución que ya terminó no admite cambios, así que esta
+# action tiene que correr DENTRO del workflow y antes de que acabe.
+name: report-run
+description: Escribe el resultado y el motivo en la ejecución de la acción de Port.
+
+inputs:
+  run-id:
+    description: El identificador de la ejecución, tal como lo envió Port.
+    required: true
+  status:
+    description: SUCCESS o FAILURE.
+    required: true
+  summary:
+    description: El motivo, en una frase que la persona pueda leer en la pantalla del formulario.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Instalar la versión de Python que el estándar declara
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version-file: ${{ github.action_path }}/../../../.python-version
+
+    - name: Instalar las herramientas desde el árbol del estándar que trae esta action
+      shell: bash
+      run: |
+        set -euo pipefail
+        python -m pip install --quiet "${{ github.action_path }}/../../.."
+
+    - name: Informar a Port
+      shell: bash
+      env:
+        RUN_ID: ${{ inputs.run-id }}
+        STATUS: ${{ inputs.status }}
+        SUMMARY: ${{ inputs.summary }}
+        STANDARD_TREE: ${{ github.action_path }}/../../..
+      run: |
+        set -euo pipefail
+        python "$STANDARD_TREE/tools/report_run.py" \
+          --run-id "$RUN_ID" --status "$STATUS" --summary "$SUMMARY"

@@ -22,7 +22,8 @@ medidos con un mismo `hooks.json` (D3, MEDICION-HOOKS-MCP-PORTABILIDAD.md §1):
 
 Un evento mal escrito **no falla: simplemente no dispara nunca**, y el autor cree que su control está
 activo. Por eso la lista es cerrada. Un evento fuera de la lista **avisa** en el hito 1 y **fallará**
-cuando 04 §2 la fije. Lo exclusivo de un cliente se documenta en `x_extensions` del `GOVERNANCE.json`.
+cuando 04 §2 la fije. Un evento exclusivo de un cliente **no se declara en ninguna parte**: lo detecta
+`rules` en el propio `hooks.json` y la ficha de Port avisa de que la unidad no es portable.
 `SubagentStop`, `PreCompact`, `Notification` y `PermissionRequest` no están medidos: fuera hasta que lo estén.
 
 No asumas el orden entre eventos: Copilot dispara `UserPromptSubmit` antes que `SessionStart`.
@@ -30,11 +31,12 @@ No asumas el orden entre eventos: Copilot dispara `UserPromptSubmit` antes que `
 ## Lo que el validador exige
 
 - **`timeout` en segundos, en cada acción**, y por debajo del techo del estándar. Un hook sin tope puede
-  colgar el cliente de quien lo instale. `timeoutSec` **no existe** en el formato y es error, no aviso.
+  colgar el cliente de quien lo instale. `timeoutSec` es el nombre del tope en Copilot, y **Claude Code
+  no lo conoce**: escrito así la acción se queda sin tope en un cliente, por eso es error y no aviso.
 - **El comando apunta dentro de la unidad**, con `${CLAUDE_PLUGIN_ROOT}/…` (C5). Una ruta absoluta no
   existe en la máquina de nadie más y ejecuta algo que no se selló.
 - **El comando no descarga nada en ejecución.** Un `curl … | bash` se salta el sello por completo.
-- **El ejecutable está en `permissions.commands`** del `GOVERNANCE.json` (C1).
+- **El ejecutable vive dentro de la unidad** y se invoca con `${CLAUDE_PLUGIN_ROOT}`, nunca por ruta relativa al directorio de trabajo.
 - **Trae pruebas** en `hooks/tests/` que ejercitan el script con entrada y salida observables; las corre
   `verify.yml` (C5).
 

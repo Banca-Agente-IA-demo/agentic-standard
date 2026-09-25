@@ -110,34 +110,46 @@ def observed_credentials(snapshot: UnitSnapshot) -> dict[str, set[str]]:
     return found
 
 
-def check_credentials_match(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
-    """Cotejo en los dos sentidos: usar sin declarar es error, y declarar sin usar también."""
+def check_every_server_has_an_accountable_team(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
+    """Todo servidor declara un equipo del banco que responde por él, tenga credenciales o no.
+
+    Responde, no posee: el servidor es de quien lo opera, y ningún equipo del banco es dueño del MCP
+    de Atlassian. Lo que se declara es quién avala internamente que esté aquí.
+
+    Antes sólo se exigía cuando la conexión usaba algún `${VAR}`, y eso dejaba entrar sin aval a los
+    servidores externos **sin autenticación**: pedir una credencial era, en la práctica, la única
+    conversación que obligaba a que alguien mirara ese servidor, y un endpoint público se pegaba en el
+    `.mcp.json` sin hablar con nadie. Sin autenticación no hay menos riesgo, hay otro riesgo: lo que
+    importa en un banco no es quién guarda la llave, es qué sale por ahí.
+
+    Con credenciales, el dueño es además quien las concede. Sin ellas, es quien avala que ese endpoint
+    puede recibir datos del banco.
+    """
+    servers = _servers(snapshot)
+    if not servers:
+        return ()
     block = (snapshot.governance or {}).get("mcp")
     if not isinstance(block, dict):
-        return ()
-    observed = observed_credentials(snapshot)
+        block = {}
     findings: list[Finding] = []
-    for server, governance in block.items():
-        if not isinstance(governance, dict):
+    for server in sorted(str(name) for name in servers):
+        governance = block.get(server)
+        accountable = governance.get("accountable_team") if isinstance(governance, dict) else None
+        if accountable:
             continue
-        declared = set(governance.get("credentials") or [])
-        used = observed.get(str(server), set())
-        for name in sorted(used - declared):
-            findings.append(
-                error(
-                    "mcp.credential-undeclared",
-                    MCP_FILE,
-                    f"la conexión de {server} usa {name!r} y el gobierno no la declara en credentials",
-                )
+        pide_credenciales = bool(observed_credentials(snapshot).get(server))
+        porque = (
+            "quien la instale no sabrá a quién pedir el acceso"
+            if pide_credenciales
+            else "nadie avala que ese servidor pueda recibir datos del banco"
+        )
+        findings.append(
+            error(
+                "mcp.server-without-accountable-team",
+                GOVERNANCE_FILE,
+                f"el gobierno de {server} no declara accountable_team: {porque}",
             )
-        for name in sorted(declared - used):
-            findings.append(
-                error(
-                    "mcp.credential-unused",
-                    GOVERNANCE_FILE,
-                    f"el gobierno de {server} declara {name!r} y la conexión no la usa",
-                )
-            )
+        )
     return tuple(findings)
 
 

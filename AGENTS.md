@@ -1,860 +1,632 @@
-# Reglas de desarrollo de `agentic-standard`
+# Estándar de código
 
-Este archivo lo leen Claude Code y GitHub Copilot CLI cuando el equipo trabaja en este repositorio.
-No se distribuye: los plugins de `plugins/` llevan sus propias instrucciones dentro del skill.
+Este documento es la referencia de código del proyecto y la norma a seguir a partir de ahora.
 
-Tiene dos partes. La primera son las reglas de arquitectura y código comunes a todo el proyecto. La
-segunda, al final, son las reglas específicas de los componentes de este repositorio.
+De dónde sale. La columna vertebral son las prácticas extraídas del código real de
+`ejemplo_codigo/last_version` (un circuito de migración de Atlas a CNF, 391 módulos Python y 213
+pasos), recogidas en `PRACTICAS-CODIGO-EJEMPLO.md`. No son una propuesta: describen algo que ese
+código ya hace de forma consistente, y cuando el propio código explica por qué lo hace, ese porqué
+está aquí. Sobre esa base se añaden dos bloques que ese código no cubre: **logging**, del que no
+tiene ni una línea en sus 391 módulos, y **workflows de GitHub Actions**, de los que no dice nada.
 
----
+Cómo leerlo si acabas de llegar. Las secciones van de lo grande a lo pequeño: dónde va cada archivo,
+qué promete cada pieza, cómo se escribe una función, y qué se comprueba antes de empujar. Cada regla
+tiene un código estable, dice qué exige y por qué (con el defecto concreto que previene cuando se
+conoce), y lleva ejemplo cuando el ejemplo aporta algo. Al final hay una checklist de revisión y una
+sección corta sobre lo que este estándar deliberadamente no adopta, para que nadie lo introduzca
+creyendo que corrige un descuido.
 
-# Parte 1. Arquitectura y código limpio
-
-Estas reglas gobiernan todo el código del proyecto: scripts Python, módulos compartidos y workflows de CI/CD en YAML. Son la fuente de verdad para cualquier sesión de Claude Code o Copilot CLI. Aplícalas en cada cambio, sea una función nueva, un refactor o un workflow.
-
----
-
-## Principios generales (aplican a Python y YAML por igual)
-
-### G1 — Una sola responsabilidad por unidad
-
-Cada función, módulo o job hace **una sola cosa**. Si necesitas la conjunción "y" para describir lo que hace una unidad, divídela.
-
-- Una función que lee datos **no** decide qué hacer con ellos.
-- Un step de CI que instala dependencias **no** también ejecuta el proceso principal.
-- Un módulo que parsea una estructura **no** también valida las reglas de negocio sobre ella.
-
-#### A nivel de archivo/módulo (el caso más fácil de pasar por alto)
-
-La responsabilidad única aplica al **módulo entero**, no solo a sus funciones. Un archivo donde cada función está bien pero que en conjunto hace de todo sigue violando G1. No te fíes solo del juicio; aplica **dos chequeos explícitos**:
-
-- **Test de la conjunción (para módulos):** si describir el archivo necesita "y" — *"renderiza entradas **y** invoca al juez **y** registra histórico **y** escribe Markdown **y** orquesta"* — está haciendo de más. Cada cláusula es un módulo candidato.
-- **Test de grupos de responsabilidad:** si las funciones del archivo caen en más de un grupo temático (p. ej. *parseo*, *juez*, *crítica*, *persistencia*, *reporte*, *orquestación*), cada grupo es candidato a su propio módulo.
-
-#### Disparador de revisión por tamaño (tripwire, **no** límite duro)
-
-Un módulo Python que supera **~300 líneas** es una **señal** —no una falla— de que probablemente acumula más de una responsabilidad. Al cruzar el umbral es **obligatorio** una de dos:
-
-- **(a)** dividirlo en módulos cohesivos, o
-- **(b)** dejar un comentario al inicio del archivo justificando *por qué* la cohesión real lo amerita (p. ej. una máquina de estados indivisible).
-
-Nunca se cruza el umbral **en silencio**. El tamaño es solo un *proxy* de la responsabilidad: la regla real es la cohesión (G1), y **la división nunca debe romper una unidad genuina solo para bajar el número** (eso contradiría G3: dividir por la métrica, no por el significado).
-
-#### Extraer un concern no cierra G1 por sí solo
-
-Tras sacar piezas a módulos compartidos (constantes, parsers, prompts, modelos), **vuelve a aplicar los dos tests al núcleo restante**. El archivo que orquesta suele seguir acumulando responsabilidades de ejecución (renderizado, evaluación, persistencia, reporte) que también deben salir; "ya extraje varias cosas" no equivale a "el archivo ya tiene una sola responsabilidad".
-
-### G2 — Sin duplicación (DRY estricto)
-
-Si la misma lógica aparece en dos lugares, extráela. No hay excepciones por "es solo una línea" o "son archivos distintos". La duplicación incluye:
-
-- Bloques de shell idénticos o casi idénticos en workflows distintos.
-- Funciones con el mismo propósito en módulos Python distintos.
-- Constantes con el mismo valor definidas en más de un lugar.
-
-### G3 — Nombra las cosas por lo que son, no por lo que hacen
-
-Los nombres deben ser autoexplicativos sin necesitar un comentario. Un comentario que explica *qué* hace el código es señal de que el nombre o la estructura son insuficientes. Los comentarios válidos explican *por qué*, no *qué*.
-
-```python
-# MAL — el comentario explica el qué
-# Calcula si el resultado supera el umbral
-ok = value >= threshold
-
-# BIEN — el nombre ya lo dice
-above_threshold = measured_value >= pass_threshold
-```
-
-### G3b — El código se escribe en inglés; la prosa, en español
-
-Los **identificadores** van en inglés: módulos, clases, funciones, variables, constantes, enums, ids
-de job y nombres de paso. La **prosa** sigue en español: comentarios, docstrings, mensajes al usuario,
-resúmenes de CI y documentación.
-
-La razón no es estética. El **contrato de datos ya estaba en inglés** —las 13 propiedades del
-`envelope.schema.json`, 16 de las 20 del blueprint de Port, y los estados del ciclo de vida
-(`conformant`, `certified`, `suspended`)—, así que el código en español era la incoherencia. Un
-`en_marketplace` junto a un `superseded_by` obliga a recordar en qué idioma se llamó cada cosa.
-
-```python
-# MAL — el identificador en español obliga a traducir mentalmente al cruzar la frontera del esquema
-def revisar_envelope(ruta, contenido): ...
-
-# BIEN — identificador en inglés, comentario y mensaje en español
-def review_envelope(path: str, content: dict) -> list[Finding]:
-    """Comprueba que el envelope declara los siete campos obligatorios."""
-```
-
-**Los nombres de las pruebas son prosa, no identificadores.** T2 exige que cada prueba nombre el
-defecto que cubre, y eso es una frase: sigue en español. Nadie las importa y `pytest` las descubre
-por el prefijo `test_`, que ya es inglés.
-
-**Excepción dura — lo que NO se traduce nunca**, porque son contratos que se emparejan por texto:
-
-- Los **tres requeridos del ruleset** (`verify / rules`, `verify / evals-verdict`,
-  `verify / collision`). Renombrar cualquiera deja **todas** las solicitudes de cambio bloqueadas para
-  siempre, esperando un estado que nadie volverá a emitir. Ocurrió dos veces en la demo anterior.
-- Los **workflows reutilizables** (`register`, `verify`, `tag`, `publish`, `rebuild-index`) y los
-  nombres de los jobs de los llamadores: otros repositorios los referencian con `uses: …@v1`.
-- El evento `version-published`, las **claves de `GOVERNANCE.json`** y las del blueprint de Port:
-  renombrarlas no es renombrar, es migrar.
-
-En esta organización los identificadores nacen en inglés desde el primer commit: no hay código
-heredado que migrar ni periodo de transición.
-
-### G4 — Los efectos secundarios son explícitos
-
-Si una función modifica estado externo (escribe un archivo, muta un argumento, modifica variables de entorno), ese efecto debe ser evidente en la firma o en el nombre:
-
-- Una función que muta su argumento debe documentarlo o — mejor — no hacerlo y devolver un valor nuevo.
-- Una función que escribe en disco se llama `write_*` o `save_*`, nunca `get_*` o `load_*`.
-- Los módulos no tienen efectos secundarios al ser importados (sin I/O en el top-level).
-
-### G5 — Estructura por capas (arquitectura hexagonal)
-
-Mientras G1 dice *qué* hace cada unidad, G5 dice *dónde vive*. El código de un componente se organiza en **paquetes por capa**, no en módulos sueltos en la raíz. El layout estándar (puertos y adaptadores):
-
-- **`domain/`** — entidades y reglas **puras**: sin I/O y sin imports del proyecto fuera de `domain/` (solo stdlib y otros módulos de dominio). Los prompts viven aquí: son lógica de negocio, no configuración (ver *Gestión de prompts*).
-- **`application/`** — casos de uso que **orquestan** el dominio a través de puertos.
-- **`ports/`** — interfaces (contratos) que la aplicación necesita del exterior.
-- **`adapters/`** — todo lo que habla con el exterior (SDKs, filesystem, persistencia, logging): implementan puertos o proveen I/O concreta.
-- La **raíz** del componente solo contiene **entry points** (el *composition root*): parsean argumentos, eligen y **cablean** los adaptadores concretos a los puertos, y disparan el caso de uso. Son los únicos que conocen implementaciones concretas.
-
-**Regla de dependencia — la flecha apunta SIEMPRE hacia adentro:**
-
-```
-entry point ──▶ application ──▶ ports ◀── adapters
-                     │                        │
-                     └──────▶ domain ◀────────┘
-```
-
-- `domain/` no importa **nada** del proyecto fuera de `domain/`.
-- `application/` importa `domain/` + `ports/`. Solo puede importar un módulo concreto de `adapters/` para **I/O de implementación única** que no justifica un puerto (ver abajo); cuando hay polimorfismo, va **siempre** por el puerto.
-- `adapters/` implementan/usan `ports/` y tipos de `domain/`; nadie importa un adaptador concreto salvo el composition root (o `application` en el caso pragmático de arriba). **Excepción pragmática (helper de adapter compartido):** un módulo `_`-privado (p.ej. `adapters/_skill_model_query.py`) o un **default inyectable** (que el composition root puede sobreescribir) compartido entre **adapters HERMANOS del MISMO componente** es infra de adapter compartida (DRY, G2), NO acoplamiento de dos implementaciones de puerto → permitido. Sigue prohibido: que un adapter importe la **implementación** de otro puerto, y cualquier import de adapter **entre componentes** distintos (esos cruzan solo por el composition root o por el límite de proceso).
-- Los **entry points** son los únicos que instancian adaptadores concretos y los inyectan.
-
-**Puertos solo donde hay polimorfismo real.** Un puerto (interfaz abstracta) se introduce cuando hay —o se anticipa— **más de una implementación** o se necesita un **doble de test** (p. ej. el proveedor de modelo: `claude` / `copilot` detrás del mismo port). Para I/O de **una sola** implementación (leer del filesystem, escribir un JSONL, generar un Markdown), NO se inventa un puerto especulativo: la aplicación llama al módulo concreto de `adapters/` directamente. Una interfaz con un único implementador es indirección sin beneficio (coherente con "no sobre-ingeniería").
-
-**Señales de violación:** un módulo de `domain/` que importa de `adapters/` (la flecha apunta hacia afuera); lógica de negocio acumulada en la raíz del paquete junto a los entry points; un puerto abstracto con una sola implementación que nadie va a intercambiar.
+Las reglas marcadas **(ya se cumple)** describen algo que el código de ejemplo ya hace. Están
+escritas porque una costumbre no escrita se pierde con la primera persona que se incorpora.
 
 ---
 
-## Python
+## 1. Estructura
 
-### P1 — Todos los imports al inicio del módulo
+### E1 · Disposición `src`, y nada importable por accidente
 
-Los imports van al principio del archivo, nunca dentro de funciones o bloques condicionales. No hay excepciones para módulos de stdlib.
+El paquete vive bajo `src/` y solo se instala lo declarado. El motivo que da el propio
+`pyproject.toml` del ejemplo es literal: «para que nada sea importable por accidente desde la raíz
+del repositorio».
 
-```python
-# MAL — import oculto dentro de una función
-def process(data):
-    import re
-    return re.sub(r"\s+", " ", data)
+El **adaptador de la línea de órdenes vive fuera del paquete** (`scripts/transform.py`), y es
+deliberado: traduce argumentos a una llamada y no forma parte de la superficie importable.
 
-# BIEN — todos los imports visibles al inicio
-import re
+### E2 · Un proceso es cuatro bandas, siempre las mismas
 
-def process(data):
-    return re.sub(r"\s+", " ", data)
+Cada nodo del circuito (`analyze`, `plan`, `migrate`, `validate`, `judge`) tiene exactamente la
+misma anatomía:
+
+```
+<nodo>/
+├── <nodo>.py                    ← encadena las cuatro bandas. No decide nada
+├── contract.py                  ← qué promete el nodo, declarativo
+├── commons/
+│   ├── enums/
+│   └── models/
+│       ├── seams.py             ← los sellos internos del nodo
+│       └── evidence_blocks.py
+├── input_sub_process/
+│   ├── input_sub_process.py     ← encadena sus pasos
+│   └── steps/                   ← un archivo por paso
+├── pre_sub_process/
+├── orchestration_sub_process/
+└── output_sub_process/
 ```
 
-### P2 — Captura solo las excepciones que esperas
+La repetición es el punto: quien conoce un nodo conoce los cinco. Buscar «dónde se valida la
+entrada» no requiere leer nada, se deduce de la ruta.
 
-`except Exception` está prohibido salvo en puntos de entrada de alto nivel (`main()`) o en degradaciones explícitamente justificadas con un comentario de *por qué*. En todos los demás casos, captura el tipo concreto.
+La organización es **por proceso y banda**, no por capas técnicas. La sección final explica por qué.
+
+### E3 · El archivo que compone no calcula
+
+Un `<nodo>.py` y un `<banda>_sub_process.py` solo dicen **en qué orden** se llama a qué y **qué
+necesita cada uno**. El código de ejemplo lo escribe en el docstring sin rodeos: «Aquí no se decide
+nada» y «Aquí no se calcula nada: cada paso es una función de `steps/`».
+
+Si un compositor tiene un `if` sobre el contenido de algo, ese `if` pertenece a un paso.
+
+### E4 · Un archivo por paso, y una sola función exportada
+
+Cada paso es su propio archivo en `steps/`, con un `__all__` de un solo nombre. No se agrupan tres
+pasos afines en un módulo «de utilidades». Las funciones privadas que el paso necesite viven en el
+mismo archivo, con prefijo `_` (ver P8).
+
+### E5 · `commons/` por nodo y `commons/` global
+
+Lo compartido dentro de un nodo vive en su `commons/`; lo compartido entre nodos, en el `commons/`
+del paquete. Un modelo que dos nodos leen **sube**; uno que solo usa un nodo **no baja** de más.
+
+### E6 · Una sola responsabilidad por unidad, y el tamaño como aviso *(ya se cumple)*
+
+Cada función, módulo o job hace **una sola cosa**. Si para describir lo que hace hace falta la
+conjunción «y», divídelo. La regla aplica al **archivo entero**, no solo a sus funciones: un módulo
+donde cada función está bien pero que en conjunto parsea, juzga, persiste y reporta sigue
+incumpliendo.
+
+Dos chequeos explícitos, porque el juicio a ojo falla:
+
+- **Test de la conjunción:** si describir el archivo necesita «y», cada cláusula es un módulo
+  candidato.
+- **Test de grupos:** si sus funciones caen en más de un grupo temático (parseo, juez, persistencia,
+  reporte, orquestación), cada grupo es candidato a su propio módulo.
+
+**Disparador por tamaño (aviso, no límite duro).** Un módulo Python que supera ~300 líneas es una
+*señal* de que probablemente acumula más de una responsabilidad. Al cruzar el umbral es obligatorio
+o dividirlo, o dejar un comentario al inicio justificando por qué la cohesión real lo amerita. Nunca
+se cruza el umbral en silencio. El tamaño es un proxy: la regla real es la cohesión, y dividir por
+el número, rompiendo una unidad genuina, es peor que no dividir.
+
+La disposición E2/E4 ya empuja hacia aquí: un archivo por paso con una función exportada es
+responsabilidad única por construcción.
+
+---
+
+## 2. Contratos y fronteras
+
+### C1 · Cada nodo declara su contrato en un archivo, aparte del código que lo cumple
+
+`contract.py` enumera qué produce el nodo, con qué claves, qué señales emite y quién las consume. Es
+declaración, no ejecución: se puede cruzar entre nodos **sin correr nada**.
+
+El contrato existe porque esa información estaba escrita **tres veces y en tres sitios distintos**
+(el prompt del comando, la sección de salidas de la invocación y los `test -f` del YAML) y nada
+garantizaba que dijeran lo mismo. De hecho no lo decían.
+
+### C2 · Pydantic en la frontera exterior, `dataclass(frozen=True)` dentro
+
+| | Qué se usa | Por qué |
+|---|---|---|
+| Lo que **entra desde fuera** (un JSON que escribió otro proceso) | modelo **pydantic** | es el punto exacto donde los datos entran al sistema de tipos desde fuera; `model_validate()` falla en el sitio y con el nombre del campo, no tres funciones más tarde |
+| Lo que **viaja entre bandas** de un mismo nodo | `@dataclass(frozen=True)` | no sale del proceso, no se serializa; lo que se le pide es estructura e inmutabilidad, «que una banda no reescriba lo que otra cerró» |
+
+Añade `slots=True` a las dataclasses de declaración. No es optimización, es una comprobación: sin
+slots, `spec.labls = (...)` (con la errata) crearía un atributo nuevo sin protestar y el valor real
+quedaría vacío; con slots, revienta al escribirlo.
+
+Un contrato se escribe como **instancia constante de módulo**, no como clase por nodo:
+`ANALYZE_CONTRACT = NodeContract(...)`. Una clase con una sola instancia invita a meterle
+comportamiento dentro de algo que tiene que seguir siendo una declaración.
+
+Decir «usa `@dataclass`» y parar ahí no basta: no dice dónde acaba la validación y empieza la
+estructura, que es justo la línea que esta regla traza.
+
+### C3 · Si ya se parseó, no se vuelve a parsear: se transporta
+
+Nace de un defecto real: el mismo archivo se parseaba tres veces en tres funciones con tres
+criterios, y dos de ellas divergieron sin que nadie lo notara. El único parseo obligatorio es el del
+productor, que tiene que abrir el archivo de todos modos; ese parseo construye el modelo y **el
+modelo viaja**.
+
+### C4 · Una convención se escribe una vez
+
+Las rutas del circuito se derivan en un solo módulo. Antes había cuatro funciones derivando la misma
+convención, «y ninguna sabía de las otras», conviviendo con cinco salidas que el emisor emitía y
+nadie leía: «funcionaba por coincidencia».
+
+Es la regla de no duplicar, sin atenuantes: si la misma lógica aparece en dos lugares, se extrae.
+No hay excepción por «es solo una línea» ni por «son archivos distintos».
+
+### C5 · Lo que se declara y lo que se implementa se cruzan automáticamente
+
+Hay un comprobador (`check_contracts`) que verifica que el grafo de contratos cierre: que la clave
+que un nodo declara producir sea la que otro declara leer, y que el modelo diga lo mismo que el
+contrato. **Sin ejecutar el circuito.**
+
+### C6 · Una clave entra al contrato solo si alguien declara leerla
+
+Un contrato no es el esquema completo de un archivo: es la intersección de lo que se promete con lo
+que alguien consume. Por eso el campo `source` de cada clave es obligatorio: dice quién la lee, y
+sin ese dato la clave no tiene justificación para estar declarada.
+
+### C7 · El verificador no repara
+
+Cuando la banda de salida encuentra un incumplimiento, no lo corrige: lo nombra y enruta. Un
+verificador que repara enmascara el defecto del productor y deja de ser comparable consigo mismo
+entre ejecuciones. Si sobra un temporal en la salida, la corrección va en la capacidad que lo creó.
+
+---
+
+## 3. Cómo se escribe un paso
+
+### S1 · El paso hace una cosa y lo dice en la primera línea
+
+El docstring empieza por el número de paso, si es determinista y la capacidad que cubre, y sigue con
+una frase de qué hace:
 
 ```python
-# MAL — enmascara bugs del propio código
-try:
-    data = json.loads(path.read_text())
-except Exception:
-    return None
+"""Paso 6 de Analyze · determinista · `cap. 16a, 42a`.
 
-# BIEN — solo las excepciones esperadas por razones de dominio
+Leer las rutas y versiones efectivas de las herramientas de build.
+"""
+```
+
+### S2 · El número de paso va en el docstring, nunca en el nombre del archivo
+
+El código lo explica: «los números caducan en cada renumeración del maestro». Un
+`step_06_read_tools.py` obliga a renombrar archivos cada vez que se inserta un paso.
+
+### S3 · Un paso no declara tipos, no anida funciones y no se queda en firma
+
+Las tres cosas están **verificadas por pruebas** que recorren los 213 archivos. Los tipos viven en
+`models/`; una función anidada dentro de otra es un paso que no se dividió (y además no se puede
+importar ni probar); y un paso que todavía levanta `NotImplementedError` es una firma, no código.
+
+### S4 · Se pregunta, no se deduce
+
+```python
+def _version(runnable: str, flag: str) -> str:
+    """La versión que la herramienta dice de sí misma. Se pregunta; no se deduce del nombre."""
+```
+
+### S5 · Lo que el paso NO hace se escribe igual que lo que hace
+
+Los docstrings más útiles del ejemplo delimitan: «NO CLASIFICA, NO DECIDE, NO BIFURCA», y explican
+qué capacidad quedó obsoleta y por qué. Delimitar evita que el siguiente añada la rama que ya se
+decidió no tener.
+
+### S6 · Los efectos secundarios son explícitos en el nombre *(ya se cumple)*
+
+El nombre de una función dice si toca el mundo. Es la costumbre más sólida del código de ejemplo:
+sus 213 pasos se llaman `read_*`, `write_*`, `verify_*`, `detect_*`, `freeze_*`, `inventory_*`,
+`compose_*`, y los predicados `is_*`, `are_*`, `did_*`, `has_*`.
+
+Tres exigencias concretas:
+
+- Una función que escribe en disco se llama `write_*` o `save_*`, **nunca** `get_*` o `load_*`.
+- Una función que devuelve un booleano se llama con un prefijo de predicado.
+- Un módulo **no tiene efectos secundarios al importarse**: nada de I/O en el top-level (ver P5).
+
+Esto es **verificable**, y debe verificarse con una prueba estructural como las que el ejemplo ya
+tiene (ver PR2): recorrer los archivos de `steps/`, comprobar que el único nombre de `__all__` empieza
+por uno de los verbos permitidos, y contar cuántos se encontraron (PR3).
+
+```python
+# MAL · lee, escribe y no lo dice
+def get_report(path): path.write_text(render()); return path
+
+# BIEN · el nombre declara el efecto
+def write_report(path: Path) -> Path: ...
+```
+
+### P4 · Las funciones no mutan sus argumentos *(ya se cumple)*
+
+Si una función recibe un `dict` o una `list`, no los modifica: devuelve un valor nuevo. La mutación
+de argumentos es un efecto secundario oculto que produce bugs difíciles de rastrear.
+
+Excepción legítima, y así aparece en el ejemplo: una función cuyo **propósito declarado** es
+escribir en una estructura del llamador (`apply_propagation(captured, target)`) puede hacerlo, pero
+entonces el nombre lo dice, el docstring lo dice, y es el único punto donde ese acto ocurre.
+
+### P8 · Las funciones internas llevan prefijo `_` *(ya se cumple)*
+
+Si una función no forma parte de la API pública del módulo, su nombre empieza con `_`. Es un
+contrato con el lector, no solo una convención. En este código la convención es más estricta: **una
+función pública por archivo** (la que nombra `__all__`) y las privadas que hagan falta, a nivel de
+módulo, no anidadas.
+
+### P2 · Captura solo las excepciones que esperas *(ya se cumple)*
+
+`except Exception` está prohibido salvo en puntos de entrada de alto nivel (`main()`) o en
+degradaciones justificadas con un comentario que diga *por qué*. En los demás casos, captura el tipo
+concreto. Si la excepción indica un bug del programador (`AttributeError`, `TypeError`, un `KeyError`
+en un dict que debería tener esa clave), no la captures: deja que burbujee.
+
+```python
+# BIEN · tal como lo hace el verificador de contratos
 try:
     data = json.loads(path.read_text(encoding="utf-8"))
-except json.JSONDecodeError as exc:
-    return None, f"JSON inválido: {exc}"
-except OSError as exc:
-    return None, f"No se pudo leer el archivo: {exc}"
+except (OSError, json.JSONDecodeError) as err:
+    add(f"{spec.name}.keys", f"{path.name} no se pudo parsear: {err}")
+    continue
 ```
 
-La regla práctica: si la excepción indica un bug del programador (`AttributeError`, `TypeError`, `KeyError` en un dict que debería tener esa clave), **no** la captures — deja que burbujee.
+### P3 · Sin `SystemExit` fuera de `main()` *(ya se cumple)*
 
-### P3 — Sin `SystemExit` fuera de `main()`
+Las funciones de dominio lanzan excepciones de dominio. Solo `main()` las convierte en `sys.exit()`.
+Así cualquier función es invocable desde una prueba o desde otro módulo sin que el proceso muera.
 
-Las funciones de dominio lanzan excepciones de dominio. Solo `main()` convierte esas excepciones en `sys.exit()`. Esto hace que cualquier función sea invocable desde tests o desde otro módulo sin que el proceso muera.
+### P5 · Sin I/O ni cómputo pesado en el top-level del módulo *(ya se cumple)*
 
-```python
-# MAL — mata el proceso desde una función de dominio
-def load_config(path):
-    if not path.exists():
-        raise SystemExit(f"Configuración no encontrada: {path}")
-
-# BIEN — excepción de dominio; main() decide qué hacer con ella
-class ConfigNotFoundError(ValueError):
-    """La configuración requerida no existe."""
-
-def load_config(path):
-    if not path.exists():
-        raise ConfigNotFoundError(f"Configuración no encontrada: {path}")
-
-# En main():
-try:
-    config = load_config(path)
-except ConfigNotFoundError as exc:
-    log.error("%s", exc)
-    sys.exit(2)
-```
-
-### P4 — Las funciones no mutan sus argumentos
-
-Si una función recibe un `dict` o una `list`, no los modifica. Devuelve un valor nuevo. La mutación de argumentos es un efecto secundario oculto que produce bugs difíciles de rastrear.
+Las variables de módulo valen para constantes puras y para declaraciones literales (un
+`ANALYZE_CONTRACT`, un `ORDER`). No valen para resultados de I/O ni de cómputo pesado: generan
+efectos al importar y hacen el módulo no probable de forma aislada.
 
 ```python
-# MAL — muta el dict del llamador sin que sea evidente
-def enrich(record: dict, extra: dict) -> dict:
-    record["extra"] = extra   # ← efecto secundario oculto
-    return record
+# MAL · lee disco al importar
+_SCHEMA = _load_schema()
 
-# BIEN — devuelve un objeto nuevo; el llamador decide cómo componer
-def enrich(record: dict, extra: dict) -> dict:
-    return {**record, "extra": extra}
-```
-
-### P5 — Sin estado mutable en el top-level del módulo con I/O
-
-Las variables de módulo están permitidas para constantes puras (`MAX_RETRIES = 3`). No están permitidas para resultados de operaciones de I/O o cómputo pesado, porque generan efectos al importar y hacen el módulo no-testeable de forma aislada.
-
-```python
-# MAL — lee disco al importar el módulo
-_SCHEMA = _load_schema()   # ← efecto al importar; rompe tests aislados
-
-# BIEN — cargado explícitamente en el punto de uso
-def main():
+# BIEN · cargado en el punto de uso
+def main() -> None:
     schema = load_schema()
-    results = process_all(items, schema=schema)
 ```
 
-### P6 — Usa tipos de dominio, no magic strings
+### P7 · Devuelve tipos coherentes *(ya se cumple)*
 
-Los valores que tienen un conjunto finito de opciones válidas son `Enum`, no strings literales. Los magic strings duplicados en múltiples lugares son candidatos inmediatos.
+Una función devuelve siempre el mismo tipo. Las tuplas `(bool, dict)` donde el significado del dict
+cambia según el bool son contratos frágiles. Usa una dataclass, un `NamedTuple`, o `None` cuando no
+hay resultado.
 
-```python
-# MAL — strings literales dispersos, un typo es un bug silencioso
-if mode == "batch":
-    ...
-elif mode == "stream":
-    ...
+El ejemplo devuelve `tuple[Finding, ...]` en todas las comprobaciones, vacía cuando no hay nada que
+reportar, y nunca `None` para decir «todo bien». Y cuando devuelve un par lo hace con significado
+fijo: `_dig()` devuelve `(encontrada, valor)`, donde el primer elemento distingue «ausente» de
+«presente valiendo `null`», que no son lo mismo.
 
-# BIEN — enum de dominio, el type checker detecta valores inválidos
-from enum import Enum
+### P10 · Los comandos externos se construyen con listas *(ya se cumple)*
 
-class ProcessingMode(str, Enum):
-    BATCH = "batch"
-    STREAM = "stream"
-
-if mode == ProcessingMode.BATCH:
-    ...
-```
-
-### P7 — Devuelve tipos coherentes
-
-Una función devuelve siempre el mismo tipo. Las tuplas `(bool, dict)` donde el significado del dict cambia según el bool son contratos frágiles. Usa `dataclass`, `NamedTuple`, o devuelve `None` cuando no hay resultado.
+Nunca por concatenación de strings: se rompe con valores que llevan espacios y es difícil de
+auditar.
 
 ```python
-# MAL — el significado del segundo elemento depende del primero
-def parse(text: str) -> tuple[bool, dict]:
-    if invalid:
-        return (False, {})
-    return (True, {"field": value})
-
-# BIEN — None indica ausencia; dataclass indica presencia con contrato explícito
-from dataclasses import dataclass
-
-@dataclass
-class ParseResult:
-    field: str
-    other: int
-
-def parse(text: str) -> ParseResult | None:
-    if invalid:
-        return None
-    return ParseResult(field=..., other=...)
-```
-
-### P8 — Las funciones internas llevan prefijo `_`
-
-Si una función no forma parte de la API pública del módulo (no está pensada para ser importada desde fuera), su nombre empieza con `_`. Esto es un contrato con el lector, no solo una convención.
-
-```python
-# MAL — aparece como API pública aunque nunca se importe desde fuera
-def find_files(directory: Path) -> list[Path]: ...
-def count_items(directory: Path) -> int: ...
-
-# BIEN — prefijo _ señala uso interno
-def _find_files(directory: Path) -> list[Path]: ...
-def _count_items(directory: Path) -> int: ...
-```
-
-### P9 — La lógica duplicada entre módulos vive en un módulo compartido
-
-Si dos módulos del proyecto contienen lógica similar (parseo, descubrimiento de archivos, lectura de configuración), esa lógica vive en un módulo compartido. Los consumidores importan desde ahí. Nunca copies y pegues código entre módulos del mismo proyecto.
-
-### P10 — Construye comandos con listas, no con concatenación de strings
-
-Cuando invoques un proceso externo con flags dinámicos (en Python o en shell), usa listas o arrays. La concatenación de strings rompe con valores que contienen espacios y es difícil de auditar.
-
-```python
-# MAL — frágil con espacios, difícil de leer
-flags = f"--output {output_dir} --format {fmt}"
-os.system(f"tool {flags}")
-
-# BIEN — lista explícita, robusta con cualquier valor
-cmd = ["tool", "--output", str(output_dir), "--format", fmt]
-if verbose:
-    cmd.append("--verbose")
+cmd = ["mvn", "dependency:tree", "-DoutputFile", str(output)]
+if offline:
+    cmd.append("--offline")
 subprocess.run(cmd, check=True)
 ```
 
-### P11 — Los umbrales y límites numéricos son constantes nombradas, no literales mágicos
-
-Cualquier número que sea una **palanca de comportamiento** —un límite, un tope, un umbral, un timeout, un número de rondas/reintentos, un top-N, una tolerancia— vive como **constante nombrada** (`UPPER_SNAKE_CASE` a nivel de módulo, o campo de un `@dataclass` de configuración), nunca como literal incrustado en la lógica. El nombre explica *qué controla* y su valor se cambia en **un solo lugar**. Generaliza PM5 (que ya lo exige para los límites de contexto de prompts) a **todo** el código.
-
-Excepción: literales sin significado de dominio (`0`, `1`, `-1` como índices o incrementos triviales) no necesitan nombre.
-
-```python
-# MAL — números mágicos dispersos: ¿qué es 7? ¿por qué 2?
-if len(cases) >= 7:
-    stop()
-for _ in range(2):
-    reauthor()
-
-# BIEN — constantes nombradas; el nombre dice QUÉ controla, un solo lugar para ajustar
-_MAX_EVAL_CASES = 7           # tope de casos por suite (acota el costo de validate/harden)
-_DEFAULT_MAX_ROUNDS = 2       # rondas de re-autoría por skill
-
-if len(cases) >= _MAX_EVAL_CASES:
-    stop()
-for _ in range(_DEFAULT_MAX_ROUNDS):
-    reauthor()
-```
-
-El **valor por defecto de un flag de CLI** que expone una de estas palancas se toma de la **misma constante** (no se re-teclea el número en `argparse`): la constante es la única fuente de verdad.
-
 ---
 
-## YAML / GitHub Actions
+## 4. Tipos, constantes y presupuestos
 
-### Y1 — La lógica reutilizable entre workflows vive en composite actions
+### T1 · `StrEnum` para los conjuntos cerrados que también se leen como texto
 
-Si dos workflows comparten lógica (instalación de dependencias, configuración de entorno, pasos de validación), esa lógica vive en un **composite action** (`.github/actions/<nombre>/action.yml`). Los workflows la invocan con `uses:`. Ninguna versión de herramienta ni parámetro de configuración se repite en dos archivos distintos.
+Los cinco procesos son un `StrEnum`, no cadenas sueltas. El razonamiento del código: «una cadena
+suelta no dice de qué familia es», así que un nombre mal escrito «no falla: se comporta como un
+proceso que no existe y toma la rama de ninguno».
 
-```yaml
-# .github/actions/setup-tooling/action.yml
-name: Setup tooling
-inputs:
-  tool-version:
-    required: true
-runs:
-  using: composite
-  steps:
-    - shell: bash
-      run: npm install -g my-tool@${{ inputs.tool-version }}
+`StrEnum` y no `Enum` cuando el mismo valor tiene que leerse como dato desde fuera del intérprete
+(un JSON, un output de workflow). `Enum` a secas cuando no sale del proceso.
+
+No basta con decir «usa un enumerado»: lo que decide entre los dos es si el valor tiene que
+leerse como texto fuera del intérprete.
+
+### T2 · Dos familias parecidas no se fusionan
+
+El ejemplo mantiene `Process` y `WorkspaceMode` separados aunque compartan cuatro valores, porque no
+son lo mismo. Confundirlas «era fácil precisamente por ser cadenas».
+
+### T3 · Una lista que no debe crecer sola no se genera
+
+```python
+ORDER: tuple[Process, ...] = (Process.ANALYZE, Process.PLAN, Process.MIGRATE, Process.VALIDATE)
 ```
 
-### Y2 — Las versiones de herramientas son variables, no literales
+Se escriben los miembros y no `tuple(Process)`, y el docstring dice por qué: «un día alguien añade
+un proceso al enumerado y esta tupla no debe crecer sola».
 
-Cualquier versión de una herramienta que aparezca en un workflow vive como variable de entorno de nivel de workflow o de job. Si la misma versión aparece en más de un workflow, vive en un composite action o en una variable de repositorio.
+### T4 · El presupuesto lo decide quien tiene la vista, y baja por la firma sin valor por defecto
 
-```yaml
-# MAL — versión hardcodeada, hay que buscarla en todos los archivos para actualizarla
-run: npm install -g my-tool@1.2.3
+La regla más distintiva del ejemplo. `OUTPUT_ATTEMPTS` estaba escrito como literal en los cuatro
+nodos; ahora lo decide el orquestador y **se pasa como argumento sin default**:
 
-# BIEN — variable en el nivel de job, un solo lugar para cambiarla
-env:
-  TOOL_VERSION: "1.2.3"
+> Con un default en la firma, un nodo llamado desde otro sitio volvería a decidir por su cuenta y
+> **la omisión y la decisión se escribirían igual**.
 
-run: npm install -g my-tool@${{ env.TOOL_VERSION }}
-```
+El mismo criterio vale para cualquier campo cuya ausencia de valor cambiaría el enrutado:
+`Finding.owner` no tiene default porque la discriminación entre reintentar y escalar depende de él.
 
-### Y3 — Las variables derivadas de inputs se resuelven una sola vez
+### T5 · Los presupuestos que cuentan cosas distintas no se llaman parecido
 
-Si el mismo `github.event.inputs.X || 'default'` aparece más de una vez en un job, resuélvelo en un step inicial o como variable de entorno del job. La expresión de resolución se escribe en un solo lugar.
+`MAX_RETRY` (vueltas del circuito), `OUTPUT_ATTEMPTS` (intentos de contrato de salida) y
+`max_attempts` (bucle de autocuración) se documentan juntos con un apartado explícito de «qué no
+es», precisamente porque se confunden.
 
-```yaml
-# MAL — la expresión con su default se repite en varios steps
-run: TOOL="${{ github.event.inputs.tool || 'default-tool' }}"
+### T6 · Todo umbral, tope, timeout, ronda o top-N es una constante nombrada *(ya se cumple)*
 
-# BIEN — resuelta una sola vez al nivel del job
-jobs:
-  build:
-    env:
-      TOOL: ${{ github.event.inputs.tool || 'default-tool' }}
-```
+Cualquier número que sea una **palanca de comportamiento** vive como constante nombrada
+(`UPPER_SNAKE_CASE` a nivel de módulo, o campo de una dataclass de configuración), nunca como literal
+incrustado en la lógica. El nombre explica *qué controla* y su valor se cambia en un solo lugar.
 
-### Y4 — Las ramas condicionales complejas son steps separados con `if:`
+Incluye los **límites de truncado de contexto de prompts** (`[:4000]`, `[:8000]`), que son decisiones
+de diseño con impacto directo en la calidad de las respuestas y no deben aparecer como literales
+dentro de una función de render.
 
-Si un step `run` contiene más de un `if/elif/else` de bash, o si la condición depende de outputs de steps anteriores, divide en steps con `if:` de Actions. Cada rama tiene un nombre descriptivo visible en la UI de GitHub.
+El **valor por defecto de un flag de CLI** que expone una de estas palancas se toma de la misma
+constante; no se re-teclea el número en `argparse`.
 
-```yaml
-# MAL — lógica de ramificación oculta en bash
-- name: Process
-  run: |
-    if [ "${{ github.event_name }}" = "pull_request" ]; then
-      tool --scope "${{ steps.scope.outputs.items }}"
-    elif [ "${{ github.event.inputs.all }}" = "true" ]; then
-      tool --all
-    fi
+Excepción: literales sin significado de dominio (`0`, `1`, `-1` como índices o incrementos triviales).
 
-# BIEN — cada rama es un step nombrado, visible en la UI
-- name: Process — PR, scope acotado
-  if: github.event_name == 'pull_request'
-  run: tool --scope "${{ steps.scope.outputs.items }}"
+```python
+# MAL
+if len(cases) >= 7: stop()
+parts.append(f"CONTEXTO:\n{context[:4000]}")
 
-- name: Process — manual, todos los items
-  if: github.event_name == 'workflow_dispatch' && github.event.inputs.all == 'true'
-  run: tool --all
-```
-
-### Y5 — Los paths son absolutos o consistentes con su `working-directory`
-
-Cuando un step escribe en un path y otro step lee de ese mismo path, ambos usan la misma expresión. Mezclar paths relativos con `working-directory` distintos genera bugs silenciosos donde el directorio existe pero está vacío.
-
-```yaml
-# MAL — el path relativo depende del working-directory del step, que puede cambiar
-- name: Process
-  working-directory: src/runner
-  run: tool --output ../reports
-
-- name: Read results
-  run: cat reports/output.json   # ¿relativo a qué raíz?
-
-# BIEN — path absoluto, sin ambigüedad entre steps
-- name: Process
-  working-directory: src/runner
-  run: tool --output "$GITHUB_WORKSPACE/reports"
-
-- name: Read results
-  run: cat "$GITHUB_WORKSPACE/reports/output.json"
-```
-
-### Y6 — Los steps con `continue-on-error` registran su outcome
-
-Si un step usa `continue-on-error: true`, su outcome debe capturarse y propagarse (al commit message, al summary, o a un output del job). Un fallo silencioso que no deja rastro es un problema de observabilidad.
-
-```yaml
-# MAL — falla silenciosamente, nada en el log lo refleja
-- name: Run process
-  continue-on-error: true
-  run: tool --all
-
-# BIEN — el outcome se captura y se incluye en el rastro
-- name: Run process
-  id: process_run
-  continue-on-error: true
-  run: tool --all
-
-- name: Commit results
-  run: |
-    OUTCOME="${{ steps.process_run.outcome }}"
-    git commit -m "results: ${GITHUB_SHA::7} (status=$OUTCOME)"
-```
-
-### Y7 — Las exclusiones en globs son explícitas con `!`
-
-Si un patrón de glob necesita excluir ciertos archivos, la exclusión es explícita con `!`. Las exclusiones implícitas por profundidad de directorio o nombre de archivo se rompen cuando cambia la estructura.
-
-```yaml
-# MAL — excluye ciertos archivos implícitamente por la profundidad del glob
-path: reports/*/*.json
-
-# BIEN — exclusión explícita y legible
-path: |
-  reports/*/*.json
-  !reports/meta.json
-```
-
-### Y8 — Los nombres de steps describen el resultado y el contexto
-
-Un step llamado `Run` o `Install` no dice nada sobre qué caso está manejando. El nombre debe ser autoexplicativo en la UI de Actions sin necesidad de abrir el log.
-
-```yaml
-# MAL — genérico, no distingue entre instancias del mismo tipo de step
-- name: Run
-- name: Install
-- name: Checkout
-
-# BIEN — nombre que describe resultado y contexto
-- name: Run process — PR, scope acotado por diff
-- name: Install dependencias del proveedor (${{ env.PROVIDER }})
-- name: Checkout histórico de resultados (read-only)
+# BIEN
+MAX_EVAL_CASES = 7            # tope de casos por suite (acota el coste de validar)
+MAX_CONTEXT_CHARS = 4_000     # ajustar si el modelo objetivo tiene ventana mayor
 ```
 
 ---
 
-## Patrones de diseño orientado a objetos
+## 5. Imports
 
-Estos patrones se aplican **cuando el problema lo justifica**, no por defecto. El criterio siempre es el mismo: ¿esta abstracción reduce complejidad real o la añade? Si la respuesta no es clara, no apliques el patrón.
+### I1 · `from __future__ import annotations` en todos los módulos
 
-### OO1 — Usa `@dataclass` para datos estructurados con semántica fija
-
-Cuando una función necesita devolver o recibir varios campos relacionados que siempre viajan juntos, encapsula esos campos en un `@dataclass`. No uses `dict`, `tuple`, o múltiples valores de retorno para datos con estructura estable — son contratos frágiles que el type checker no puede verificar.
-
-**Cuándo aplica:** resultado de parseo, configuración de ejecución, resumen de resultados, cualquier estructura que se pase entre más de dos funciones.
+### I2 · Lo que solo se usa para tipar va en `TYPE_CHECKING`
 
 ```python
-# MAL — tuple con semántica implícita; el orden importa y no se ve
-def parse_config(text: str) -> tuple[bool, dict]:
-    return (True, {"host": "...", "port": 8080})
+from typing import TYPE_CHECKING
 
-# MAL — dict sin contrato; cualquier clave puede faltar
-def get_run_options() -> dict:
-    return {"timeout": 30, "retries": 3, "verbose": False}
-
-# BIEN — contrato explícito, autocompletado, verificable por el type checker
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class Config:
-    host: str
-    port: int
-
-@dataclass
-class RunOptions:
-    timeout: int = 30
-    retries: int = 3
-    verbose: bool = False
+if TYPE_CHECKING:  # pragma: no cover
+    from migration.transform.commons.paths import CircuitPaths
 ```
 
-Usa `frozen=True` cuando el objeto no debe mutar después de crearse (configuraciones, resultados).
+El `# pragma: no cover` es sistemático: ese bloque no se ejecuta y no debe contar como descubierto.
 
-### OO2 — Usa jerarquías de excepciones para errores de dominio
+### I3 · `__all__` explícito en cada módulo
 
-Define una excepción base para el dominio del proyecto y subclases para cada categoría de error. Esto permite capturar errores a diferentes niveles de granularidad sin usar `except Exception`.
+Un solo nombre en los pasos; la lista ordenada en los módulos de contrato.
 
-**Cuándo aplica:** siempre que el código lance más de un tipo de error de dominio distinto.
+### I4 · Import por nombre completo, sin alias creativos
+
+El ejemplo importa `from ...steps.freeze_context import freeze_context`. Las líneas quedan largas y
+se parten con paréntesis, pero se puede buscar el nombre y encontrarlo.
+
+### P1 · Todos los imports al inicio del módulo *(ya se cumple)*
+
+Nunca dentro de funciones ni de bloques condicionales, tampoco los de stdlib. La única excepción
+admitida es un import de una dependencia opcional que no todos los consumidores del módulo traen en
+su camino, y entonces se escribe el motivo justo encima:
 
 ```python
-# exceptions.py — módulo compartido del proyecto
-class ProjectError(Exception):
-    """Excepción base del proyecto. Captura todo lo del dominio sin capturar bugs."""
-
-class InputError(ProjectError):
-    """Los datos de entrada son inválidos o no se pueden leer."""
-
-class InputNotFoundError(InputError):
-    """El recurso de entrada no existe."""
-
-class InputMalformedError(InputError):
-    """El recurso existe pero su estructura es inválida."""
-
-class ServiceError(ProjectError):
-    """Error en la comunicación con un servicio externo."""
-
-class ProcessingError(ProjectError):
-    """Error durante el procesamiento principal."""
+# EL IMPORT VA DENTRO Y NO ARRIBA. Este módulo lo importan los cinco procesos y no todos traen
+# pydantic en su camino.
+from pydantic import BaseModel  # noqa: PLC0415
 ```
 
-Con esta jerarquía, `main()` puede capturar `ProjectError` para todo el dominio, y funciones específicas pueden capturar solo `InputError` o `ServiceError` según su responsabilidad.
-
-```python
-# Captura granular en funciones de dominio
-try:
-    data = load_input(path)
-except InputNotFoundError as exc:
-    log.error("Recurso no encontrado: %s", exc)
-    sys.exit(2)
-
-# Captura amplia solo en el punto de entrada
-try:
-    run(config)
-except ProjectError as exc:
-    log.critical("Error irrecuperable: %s", exc, exc_info=True)
-    sys.exit(1)
-```
-
-### OO3 — Usa el patrón Strategy para comportamientos intercambiables
-
-Cuando una función recibe un parámetro que selecciona entre N implementaciones de la misma operación — un `if/elif` que crece con cada nuevo tipo — extrae cada implementación como un objeto que cumple un protocolo común.
-
-**Cuándo aplica:** cuando el `if/elif` sobre un tipo ha crecido más de dos veces, o cuando se anticipa que seguirá creciendo.
-
-```python
-# MAL — la función crece con cada nuevo formato
-def render(data: dict, fmt: str) -> str:
-    if fmt == "json":
-        return json.dumps(data)
-    elif fmt == "csv":
-        ...
-    elif fmt == "xml":   # ← hay que tocar esta función para añadir un formato
-        ...
-
-# BIEN — Protocol + registro; añadir un formato no toca el código existente
-from typing import Protocol
-
-class Renderer(Protocol):
-    def render(self, data: dict) -> str: ...
-
-class JsonRenderer:
-    def render(self, data: dict) -> str:
-        return json.dumps(data)
-
-class CsvRenderer:
-    def render(self, data: dict) -> str:
-        ...
-
-RENDERERS: dict[str, Renderer] = {
-    "json": JsonRenderer(),
-    "csv": CsvRenderer(),
-}
-
-renderer = RENDERERS.get(fmt)
-if renderer is None:
-    raise ValueError(f"Formato desconocido: {fmt!r}")
-output = renderer.render(data)
-```
-
-### OO4 — Usa el patrón Repository para aislar el acceso a datos
-
-Si varias partes del código leen de la misma fuente de datos, centraliza ese acceso en una clase Repository. El resto del código habla con el Repository, no con la fuente directamente. Esto permite cambiar la fuente (filesystem → base de datos → API) sin tocar la lógica de negocio.
-
-**Cuándo aplica:** cuando más de dos módulos leen del mismo tipo de fuente, o cuando la fuente puede cambiar.
-
-```python
-# MAL — acceso a la fuente disperso en múltiples módulos
-# En módulo A:
-data = Path("store/item.json").read_text()
-# En módulo B:
-data = Path("store/item.json").read_text()
-# En módulo C:
-path = Path("store") / name / "item.json"
-data = path.read_text()
-
-# BIEN — un solo punto de acceso; los módulos A, B, C dependen del Repository
-class ItemRepository:
-    def __init__(self, store_dir: Path):
-        self._dir = store_dir
-
-    def read(self, name: str) -> dict:
-        path = self._dir / name / "item.json"
-        return json.loads(path.read_text(encoding="utf-8"))
-
-    def exists(self, name: str) -> bool:
-        return (self._dir / name / "item.json").exists()
-
-    def list_all(self) -> list[str]:
-        return sorted(p.parent.name for p in self._dir.rglob("item.json"))
-```
-
-### OO5 — Usa `Protocol` en vez de herencia para definir contratos
-
-Cuando necesitas que múltiples clases cumplan una interfaz, define el contrato con `typing.Protocol`. Esto permite duck typing verificado estáticamente sin herencia forzada — cualquier clase que tenga los métodos correctos cumple el protocolo automáticamente.
-
-**Cuándo aplica:** siempre que vayas a escribir una clase base abstracta con métodos `abstractmethod`. Prefiere `Protocol` sobre `ABC` en casi todos los casos.
-
-```python
-# MAL — herencia forzada; las implementaciones quedan acopladas a la base
-from abc import ABC, abstractmethod
-
-class BaseProcessor(ABC):
-    @abstractmethod
-    def process(self, data: str) -> str: ...
-
-class ConcreteProcessor(BaseProcessor):   # obligado a heredar
-    def process(self, data: str) -> str: ...
-
-# BIEN — Protocol; cualquier clase con el método correcto es compatible
-from typing import Protocol
-
-class Processor(Protocol):
-    def process(self, data: str) -> str: ...
-
-class ConcreteProcessor:   # no hereda nada
-    def process(self, data: str) -> str: ...
-
-# El type checker verifica la compatibilidad sin herencia
-def run(processor: Processor, data: str) -> str:
-    return processor.process(data)
-```
-
-### OO6 — No uses clases donde las funciones son suficientes
-
-Una clase con un solo método público y sin estado entre llamadas es una función disfrazada. Las funciones son más simples, más fáciles de testear y no requieren instanciación.
-
-**Criterio para usar una clase:** el objeto tiene **estado que persiste entre llamadas** o **agrupa múltiples operaciones relacionadas sobre los mismos datos**. Si ninguna condición aplica, usa una función.
-
-```python
-# MAL — clase sin estado real
-class DataProcessor:
-    def run(self, data: dict) -> dict:
-        return transform(data)
-
-processor = DataProcessor()
-result = processor.run(data)
-
-# BIEN — función directa
-def process_data(data: dict) -> dict:
-    return transform(data)
-
-result = process_data(data)
-
-# BIEN — clase con estado real (mantiene conexión entre llamadas)
-class ApiClient:
-    def __init__(self, base_url: str, token: str):
-        self._base_url = base_url
-        self._session = _create_session(token)   # estado persistente
-
-    def fetch(self, endpoint: str) -> dict: ...
-    def post(self, endpoint: str, body: dict) -> dict: ...
-```
+Sin ese comentario, un import dentro de una función es un incumplimiento.
 
 ---
 
-## Logging
+## 6. Comentarios, docstrings e idioma
 
-El logging es observabilidad permanente, no andamiaje temporal. Un mensaje que se añade para debuggear y luego se elimina indica que el sistema de logging no estaba bien definido. Estas reglas establecen una estrategia estable que funciona en desarrollo y en CI sin modificar el código entre entornos.
+### D1 · El comentario explica por qué, y sobre todo por qué NO
 
-### L1 — Usa `logging` de stdlib, nunca `print` para diagnóstico
-
-`print` está reservado exclusivamente para la salida que el caller espera consumir programáticamente (JSON estructurado, CSV, texto formateado que se redirige a otro proceso). Todo lo demás — progreso, advertencias, errores internos, información de debug — usa el módulo `logging`.
+Es lo que más distingue a este código. No se comenta lo que hace la línea: se comenta la decisión, y
+muy a menudo la decisión **descartada**:
 
 ```python
-# MAL — diagnóstico mezclado con print
+# EL ENTRY POINT DEL JOB NO SE DECLARA AQUÍ, y no es un olvido.
+# ... y las dos mitades eran falsas: ese módulo no existe, y el workflow no llama a un comando
+# instalado sino al archivo por su ruta.
+```
+
+Corolario: un comentario que explica *qué* hace el código es señal de que el nombre o la estructura
+son insuficientes. Arregla el nombre, no añadas el comentario.
+
+### D2 · Una corrección deja constancia de dónde se midió
+
+```python
+# Decía «de dos cosas». Corregido al revisar el paso 15 de Plan.
+```
+
+No es ceremonia: es lo que impide que el siguiente reintroduzca el error creyendo que corrige un
+descuido.
+
+### D3 · El docstring del módulo tiene secciones y cita su fuente
+
+`Por qué existe`, `Qué cubre y qué no`, `Trazabilidad`, `Referencias`, con las capacidades y los
+documentos de diseño concretos. Un lector nuevo sabe de dónde salió cada exigencia.
+
+### D4 · Si algo está sin pinear, sin decidir o pendiente, se dice en el sitio
+
+```python
+# SIN PIN, y es deliberado hasta que se resuelva una pregunta abierta: el informe E2 dice medir
+# «con lizard» pero no declara con qué versión.
+```
+
+### D5 · El código se escribe en inglés; la prosa, en español *(ya se cumple)*
+
+Los **identificadores** van en inglés: módulos, clases, funciones, variables, constantes, enums, ids
+de job y nombres de paso. La **prosa** sigue en español: comentarios, docstrings, mensajes al
+usuario, resúmenes de CI y documentación.
+
+La razón no es estética: el contrato de datos ya está en inglés, así que el código en español sería
+la incoherencia. Un `en_marketplace` junto a un `superseded_by` obliga a recordar en qué idioma se
+llamó cada cosa.
+
+**Los nombres de las pruebas son prosa, no identificadores** (ver PR1): siguen en español. En el
+código de ejemplo los **nombres de archivo** de las pruebas también están en español
+(`test_bandas_de_precalculo.py`); es la única desviación conocida y no se propaga: los archivos
+nuevos van en inglés.
+
+**Excepción dura, lo que no se traduce nunca**, porque son contratos que se emparejan por texto:
+
+- Los **cuatro identificadores del gate** de `agentes-sdlc` (`conformidad`, `validar`,
+  `comportamiento`, `Veredicto de comportamiento`). Son comprobaciones requeridas del ruleset, y
+  renombrar cualquiera deja todas las solicitudes de cambio bloqueadas para siempre, esperando un
+  estado que nadie volverá a emitir. Ya ocurrió dos veces.
+- Los **cinco workflows reutilizables** (`validar`, `evaluar`, `publicar`, `etiquetar`,
+  `promocionar`): otros repositorios los referencian con `uses: …@main`.
+- Las **claves ya persistidas** en Port o en los esquemas: renombrarlas no es renombrar, es migrar.
+
+Aplica al código nuevo. No dispara una migración masiva del existente.
+
+---
+
+## 7. Errores
+
+### X1 · Los errores de dominio tienen una jerarquía propia
+
+Define una excepción base del dominio y subclases por categoría. Eso permite capturar a distintos
+niveles de granularidad sin recurrir a `except Exception`: `main()` captura la base, y las funciones
+concretas capturan solo la rama que les incumbe.
+
+**El defecto que corrige, medido aquí.** Hoy el código de ejemplo tiene **tres bases sin relación
+entre sí**:
+
+| Excepción | Base | Dónde |
+|---|---|---|
+| `ProvisionError` | `RuntimeError` | `provision/artifactory_trust.py` |
+| `InvocationFailed` | `RuntimeError` | `transform/commons/agent_invocation.py` |
+| `CircuitEscalation` | `Exception` | `transform/commons/escalation.py` |
+
+No hay ningún punto desde el que se puedan capturar las tres sin nombrarlas una a una ni caer en
+`except Exception`, y la tercera ni siquiera comparte base con las otras dos. Cuando se añada la
+cuarta, el `except` de `main()` habrá quedado incompleto sin que nada lo avise.
+
+```python
+# exceptions.py · módulo compartido
+class MigrationError(Exception):
+    """Base del dominio. Captura todo lo nuestro sin capturar bugs."""
+
+class ProvisionError(MigrationError): ...
+class InvocationFailed(MigrationError): ...
+class CircuitEscalation(MigrationError): ...
+```
+
+### X2 · Una comprobación devuelve hallazgos; una imposibilidad lanza
+
+El ejemplo separa las dos cosas y merece copiarse: las funciones de contrato devuelven
+`tuple[Finding, ...]` y **quien llama decide qué hacer**. Esa distinción es la que permite que el
+mismo código sirva a los dos extremos de la costura (la salida del productor y la entrada del
+consumidor), cambiando solo a quién se atribuye el hallazgo. Una excepción se reserva para lo que
+impide continuar, no para reportar un incumplimiento previsto.
+
+---
+
+## 8. Logging
+
+Esta sección cubre **la mayor carencia del código de ejemplo**: 391 módulos sin una sola línea de
+`logging`. Todo el diagnóstico existente es lo que quede en excepciones y en hallazgos.
+
+Los **25 `print` actuales están en tres archivos** (`provision/artifactory_trust.py`,
+`provision/artifactory_trust_local.py`, `check_contracts.py`) y son **salida legítima de CLI**, no
+diagnóstico: son lo que el operador lee o lo que otro proceso consume. Esos `print` se quedan (ver
+L1 y L8). Lo que falta es el logging, que es otra cosa y va a otro sitio.
+
+El logging es observabilidad permanente, no andamiaje temporal. Un mensaje que se añade para
+depurar y luego se borra indica que el sistema de logging no estaba bien definido.
+
+### L1 · Usa `logging` de stdlib, nunca `print` para diagnóstico
+
+`print` está reservado a la salida que el caller espera consumir: el informe que imprime
+`check_contracts`, el JSON que otro proceso lee, el texto que se redirige. Todo lo demás (progreso,
+advertencias, errores internos, detalle de depuración) usa `logging`.
+
+```python
+# MAL · diagnóstico por print
 print(f"Error procesando {item}: {exc}", file=sys.stderr)
-print(f"Procesando item {item_id}...", file=sys.stderr)
 
-# BIEN — logging con nivel y contexto
+# BIEN
 log.error("Error procesando item %s", item, exc_info=exc)
-log.info("Procesando item %s", item_id)
 ```
 
-### L2 — Un logger por módulo, nombrado con `__name__`
-
-Cada módulo declara su propio logger al inicio del archivo. El nombre `__name__` produce jerarquías automáticas que permiten filtrar por módulo desde la configuración, sin tocar el código.
+### L2 · Un logger por módulo, nombrado con `__name__`
 
 ```python
-# Al inicio de cada módulo, después de los imports
 import logging
 
 log = logging.getLogger(__name__)
-
-# Nunca uses el root logger directamente en módulos de librería
-logging.warning("mensaje")   # MAL — contamina el root logger
-log.warning("mensaje")       # BIEN — namespaced al módulo
 ```
 
-### L3 — Usa el nivel correcto para cada tipo de mensaje
+`__name__` produce jerarquías automáticas que permiten filtrar por módulo desde la configuración,
+sin tocar el código. Nunca uses el root logger (`logging.warning(...)`) desde un módulo de librería.
 
-La selección de nivel no es opcional ni subjetiva. Cada nivel tiene una semántica precisa:
+### L3 · Usa el nivel correcto para cada tipo de mensaje
 
 | Nivel | Cuándo usarlo |
 |---|---|
-| `DEBUG` | Detalles internos útiles solo para diagnosticar un bug concreto: valores de variables, paths intermedios, decisiones de ramificación |
-| `INFO` | Eventos normales del flujo que confirman que el sistema funciona: inicio de operaciones, ítems procesados, archivos escritos |
-| `WARNING` | Algo inesperado que no impide continuar pero merece atención: configuración ausente con fallback, campo opcional faltante, degradación de funcionalidad |
-| `ERROR` | Fallo concreto en una operación que aborta esa operación (no el proceso): excepción capturada, recurso no encontrado, respuesta inválida de un servicio |
-| `CRITICAL` | Fallo que hace imposible continuar el proceso completo: no se puede inicializar el sistema, dependencia crítica ausente |
+| `DEBUG` | Detalles internos útiles solo para diagnosticar un bug concreto: valores de variables, rutas intermedias, decisiones de ramificación |
+| `INFO` | Eventos normales que confirman que el sistema funciona: inicio de un paso, artefacto escrito, intento concedido |
+| `WARNING` | Algo inesperado que no impide continuar: archivo opcional ausente que activa el modo alternativo, hallazgo no bloqueante |
+| `ERROR` | Fallo que aborta una operación, no el proceso: excepción capturada, contrato de salida incumplido |
+| `CRITICAL` | Fallo que hace imposible continuar: no se puede inicializar, dependencia crítica ausente |
+
+### L4 · Configura el logging una sola vez, en `main()`
+
+Los módulos de librería **nunca** configuran el logging: solo lo usan. Un módulo que llama a
+`logging.basicConfig()` o añade handlers rompe la configuración del proceso que lo importa.
+
+### L5 · Todos los CLIs tienen el flag `--verbose` / `-v`
+
+Activa `DEBUG`; sin él, el nivel es `INFO`. Esto reemplaza el patrón de añadir y quitar prints
+temporales: los mensajes de depuración siempre están en el código, solo se encienden cuando hacen
+falta.
 
 ```python
-log.debug("Estado interno: variable=%s resultado=%s", var, result)
-log.info("Operación completada: item=%s duración=%.2fs", item_id, elapsed)
-log.warning("Configuración opcional ausente; usando valor por defecto: %s", default)
-log.error("Fallo al procesar item %s", item_id, exc_info=True)
-log.critical("No se puede inicializar el sistema", exc_info=True)
+ap.add_argument("--verbose", "-v", action="store_true",
+                help="Activa logging DEBUG (detalles internos de ejecución).")
 ```
 
-### L4 — Configura el logging una sola vez, en `main()`
-
-La configuración del logging (nivel, formato, handlers) ocurre exactamente una vez, en `main()`, antes de cualquier otra operación. Los módulos de librería **nunca** configuran el logging — solo lo usan. Un módulo que llama a `logging.basicConfig()` o añade handlers rompe la configuración del proceso que lo importa.
+### L6 · Loggea excepciones con `exc_info=True`, no con f-strings manuales
 
 ```python
-# MAL — módulo de librería configurando el logger
-logging.basicConfig(level=logging.DEBUG)   # ← contamina al importador
-
-# BIEN — configuración solo en el punto de entrada
-def _configure_logging(verbose: bool) -> None:
-    level = logging.DEBUG if verbose else logging.INFO
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(logging.Formatter(
-        fmt="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
-        datefmt="%H:%M:%S",
-    ))
-    logging.getLogger().setLevel(level)
-    logging.getLogger().addHandler(handler)
-
-def main() -> None:
-    args = _parse_args()
-    _configure_logging(verbose=args.verbose)
-    ...
-```
-
-### L5 — Todos los CLIs tienen el flag `--verbose` / `-v`
-
-Todos los scripts con `argparse` exponen un flag `--verbose` (o `-v`) que activa el nivel `DEBUG`. En ausencia del flag, el nivel por defecto es `INFO`. Esto reemplaza el patrón de añadir y quitar prints temporales: los mensajes de debug siempre están en el código, solo se activan cuando se necesitan.
-
-```python
-ap.add_argument(
-    "--verbose", "-v",
-    action="store_true",
-    help="Activa logging DEBUG (detalles internos de ejecución).",
-)
-```
-
-En CI el flag no se pasa por defecto. En desarrollo, `script.py --verbose` muestra todo el detalle sin cambiar una sola línea de código.
-
-### L6 — Loggea excepciones con `exc_info=True`, no con f-strings manuales
-
-Pasar `exc_info=True` incluye el traceback completo en el log. Un f-string con `{type(exc).__name__}: {exc}` solo da el mensaje, sin contexto de dónde ocurrió el error.
-
-```python
-# MAL — pierde el traceback
+# MAL · pierde el traceback
 log.error("Error: %s: %s", type(exc).__name__, exc)
 
-# BIEN — traceback completo incluido automáticamente
+# BIEN
 log.error("Fallo al procesar %s", item_id, exc_info=True)
-
-# También válido dentro de un bloque except
-except ValueError as exc:
-    log.error("Valor inválido en %s", context, exc_info=exc)
 ```
 
-### L7 — Los mensajes de log usan `%s`, no f-strings
+### L7 · Los mensajes de log usan `%s`, no f-strings
 
-El módulo `logging` aplica el formato `%s` de forma lazy — solo si el mensaje va a ser emitido según el nivel activo. Con f-strings, el string se construye siempre, aunque el nivel esté desactivado.
+`logging` aplica el formato de forma perezosa, solo si el mensaje va a emitirse. Con f-strings la
+cadena se construye siempre, aunque el nivel esté apagado.
 
 ```python
-# MAL — expresión evaluada siempre, aunque DEBUG esté desactivado
-log.debug(f"items={[item.name for item in collection]}")
-
-# BIEN — evaluado solo si DEBUG está activo
-log.debug("items=%s", [item.name for item in collection])
+log.debug("pasos=%s", [s.name for s in steps])
 ```
 
-### L8 — Separa la salida estructurada del logging
+### L8 · Separa la salida estructurada del logging
 
-Si el proceso produce salida que otro proceso va a consumir (JSON, CSV, texto formateado), esa salida va a `stdout` mediante `print`. El logging siempre va a `stderr`. Las dos streams nunca se mezclan.
+La salida que otro proceso consume va a `stdout` con `print`. El logging va siempre a `stderr`. Las
+dos corrientes no se mezclan. Es exactamente la línea que separa los 25 `print` actuales (stdout,
+legítimos) de lo que hay que añadir (stderr, logging).
 
-```python
-# stdout — salida estructurada que el caller consume
-print(json.dumps(result, indent=2, ensure_ascii=False))
+### L9 · El formato del log se adapta al entorno
 
-# stderr — logging legible para humanos (vía handler configurado en main())
-log.info("Proceso completado: %d ítems procesados", count)
-```
-
-### L9 — El formato del log se adapta al entorno
-
-En CI el formato es plano y sin colores para que los logs sean parseables. En desarrollo puede incluir timestamps o colores. La detección del entorno ocurre en `_configure_logging()`, nunca en los módulos de librería.
+En CI, formato plano y sin colores para que sea parseable; en desarrollo puede llevar marca de
+tiempo. La detección del entorno ocurre en la función que configura el logging, nunca en un módulo
+de librería.
 
 ```python
 def _configure_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     in_ci = os.getenv("CI") == "true"
-    fmt = (
-        "%(levelname)-8s %(name)s — %(message)s"
-        if in_ci else
-        "%(asctime)s %(levelname)-8s %(name)s — %(message)s"
-    )
+    fmt = ("%(levelname)-8s %(name)s · %(message)s" if in_ci
+           else "%(asctime)s %(levelname)-8s %(name)s · %(message)s")
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter(fmt=fmt, datefmt="%H:%M:%S"))
     logging.getLogger().setLevel(level)
@@ -863,391 +635,392 @@ def _configure_logging(verbose: bool) -> None:
 
 ---
 
-## Gestión de prompts
+## 9. Prompts
 
-Los prompts son lógica de negocio, no strings de configuración. Un prompt hardcodeado dentro de una función es tan problemático como una query SQL incrustada en un controlador: imposible de versionar de forma aislada, imposible de testear sin ejecutar la función completa, y difícil de mantener cuando el modelo o los requisitos cambian.
+El proyecto no centraliza prompts en un `prompts.py`. Resuelve el problema un nivel más arriba, y es
+mejor: **el prompt se genera desde el contrato del nodo**.
 
-### PM1 — Los prompts estáticos son constantes nombradas, nunca strings inline
+### PM1 · El prompt se deriva de la declaración, no se escribe a mano
 
-Un prompt que no cambia entre invocaciones es una constante. Vive al inicio del módulo (o en `prompts.py`), con nombre en `UPPER_SNAKE_CASE` que describa su **rol en el sistema**. El sufijo `_SYSTEM_PROMPT` o `_USER_PROMPT` es obligatorio para hacer explícito el rol del mensaje en la conversación con el modelo.
+`build_agent_prompt(ANALYZE_CONTRACT, context_block, findings)` compone tres bloques: la corrección
+dirigida, la evidencia y el contrato de salida renderizado por `describe_contract_for_prompt()`. El
+motivo está escrito en el código:
 
-```python
-# MAL — string inline invisible desde fuera de la función
-def evaluate(adapter, data):
-    resp = adapter.invoke(
-        "Eres un evaluador. Responde solo JSON...",
-        build_message(data)
-    )
+> Existe para que **lo que se le pide a la invocación y lo que después se le verifica salgan de la
+> misma declaración**. Si se escribieran por separado podrían divergir, que es exactamente la deriva
+> que este contrato previene.
 
-# MAL — nombre que describe la implementación, no el rol
-STRICT_JSON_CHECKER = "Eres un evaluador..."
+El paso que lo usa lo repite: «lo que aquí se pide y lo que los pasos 35 a 38 comprueban salen de la
+misma declaración». Centralizar cadenas de texto en un módulo no da eso: dos cadenas centralizadas
+divergen igual de bien que dos dispersas.
 
-# BIEN — nombre que describe el rol; sufijo que indica su posición en la conversación
-EVALUATOR_SYSTEM_PROMPT = "Eres un evaluador..."
-ROUTER_SYSTEM_PROMPT = "Eres un router..."
-SUMMARIZER_SYSTEM_PROMPT = "Eres un resumidor..."
-```
+Consecuencia práctica: si hay que pedirle algo nuevo al modelo, se añade al contrato, no al prompt.
 
-### PM2 — Los prompts dinámicos se construyen en funciones `build_*_message()` dedicadas
+### PM2 · Una sola función de render, con la variación por parámetro
 
-Cuando un prompt necesita datos en tiempo de ejecución, su construcción vive en una función exclusivamente dedicada a eso. La función que invoca al LLM **no** construye el prompt — lo recibe ya construido. Esto permite testear la construcción del mensaje sin llamar al modelo.
+La primera invocación y la correctiva son **la misma llamada** con el bloque de hallazgos vacío o
+lleno. No se parte en `render_prompt` y `render_prompt_correctivo`: sería duplicar una capacidad para
+expresar un argumento opcional. Y el parámetro tiene que estar en la firma aunque la primera vuelta
+lo deje vacío, porque sin él el reintento sería literalmente la misma llamada, y entonces no es una
+corrección sino una repetición.
 
-```python
-# MAL — construcción e invocación mezcladas en la misma función
-def evaluate(adapter, item, context=""):
-    parts = [f"ITEM:\n{item}"]
-    if context:
-        parts.append(f"CONTEXTO:\n{context[:4000]}")
-    msg = "\n\n".join(parts)
-    return adapter.invoke(EVALUATOR_SYSTEM_PROMPT, msg)
+### PM3 · Al prompt solo entra lo que el modelo tiene que juzgar
 
-# BIEN — construcción separada de invocación
-def build_evaluator_message(item: str, context: str = "") -> str:
-    """Construye el mensaje de usuario para el evaluador."""
-    parts = [f"ITEM:\n{item}"]
-    if context:
-        parts.append(f"CONTEXTO:\n{context[:_MAX_CONTEXT_CHARS]}")
-    return "\n\n".join(parts)
+El bloque de contexto **no es un volcado del sello: es una proyección de él**, y qué entra se deriva
+de lo que los pasos declaran juzgar o redactar. El motivo no es el coste: «darle evidencia que no
+tiene que juzgar es ponerle delante material sobre el que podría actuar sin que nadie se lo haya
+pedido».
 
-def evaluate(adapter: LLMAdapter, item: str, context: str = "") -> EvalResult:
-    """Invoca el evaluador. No construye el prompt."""
-    message = build_evaluator_message(item, context)
-    resp = adapter.invoke(EVALUATOR_SYSTEM_PROMPT, message)
-    return _parse_eval_response(resp)
-```
+Lo mismo por el otro lado en el bloque correctivo: solo entran los hallazgos que la invocación de
+ese nodo puede reparar. Un hallazgo de otro dueño solo consigue que intente arreglar algo que no está
+en su mano.
 
-### PM3 — Todos los prompts del proyecto viven en `prompts.py`
+### PM4 · El formato de respuesta esperado se documenta junto al prompt
 
-Los prompts tienen ciclo de vida propio: se iteran, se versionan y se ajustan independientemente del código que los usa. Dispersarlos en múltiples módulos hace imposible auditar qué instrucciones está recibiendo el modelo. Un módulo `prompts.py` centraliza todas las constantes `*_PROMPT` y las funciones `build_*_message()`.
+El prompt que pide una respuesta en cierto formato y el código que la parsea son un contrato. Si el
+formato cambia en el prompt pero no en el parser, el fallo es silencioso. La documentación del
+formato va como comentario inmediatamente antes de la constante o de la función de render. Si la
+respuesta se parsea a un modelo pydantic, ese modelo es la documentación viva del contrato y se cita
+por su nombre.
 
-```
-project/
-├── prompts.py       ← todas las constantes *_PROMPT y funciones build_*_message()
-├── runner.py        ← importa desde prompts.py, no define prompts propios
-├── evaluator.py     ← importa desde prompts.py
-└── ...
-```
+### PM5 · Los límites de truncado son constantes nombradas
 
-```python
-# prompts.py
-"""Todos los prompts del proyecto.
-
-Convenciones:
-- *_SYSTEM_PROMPT: instrucciones de rol para el modelo (mensaje system).
-- *_USER_PROMPT: plantillas de mensaje de usuario estáticas.
-- build_*_message(): construye mensajes de usuario con datos dinámicos.
-- _MAX_*_CHARS: límites de truncado de contexto (constantes privadas).
-"""
-```
-
-### PM4 — Documenta el formato de respuesta esperado junto al prompt
-
-El prompt que pide una respuesta en cierto formato y el código que parsea esa respuesta son un contrato. Si el formato cambia en el prompt pero no en el parser, el fallo es silencioso. La documentación del formato vive como comentario inmediatamente antes de la constante.
-
-```python
-# Formato de respuesta esperado:
-# {
-#   "result": "pass" | "fail",
-#   "reason": "string explicando la decisión"
-# }
-EVALUATOR_SYSTEM_PROMPT = (
-    "Eres un evaluador..."
-)
-```
-
-Si el proyecto usa `@dataclass` para los resultados del LLM, el dataclass mismo sirve como documentación viva del contrato.
-
-### PM5 — Los límites de contexto son constantes nombradas, no literales mágicos
-
-Los truncados de contexto (`[:4000]`, `[:8000]`, `[:500]`) son decisiones de diseño con impacto directo en la calidad de las respuestas. Deben ser constantes nombradas privadas del módulo `prompts.py`, no literales dispersos en las funciones `build_*`.
-
-```python
-# MAL — literales mágicos sin nombre ni justificación
-parts.append(f"CONTEXTO:\n{context[:4000]}")
-parts.append(f"OUTPUT:\n{output[:8000]}")
-
-# BIEN — constantes nombradas que explican el propósito del límite
-# Ajustar si el modelo objetivo tiene ventana de contexto mayor.
-_MAX_CONTEXT_CHARS = 4_000
-_MAX_OUTPUT_CHARS = 8_000
-
-def build_evaluator_message(item: str, context: str = "", output: str = "") -> str:
-    parts = [f"ITEM:\n{item}"]
-    if context:
-        parts.append(f"CONTEXTO:\n{context[:_MAX_CONTEXT_CHARS]}")
-    if output:
-        parts.append(f"OUTPUT:\n{output[:_MAX_OUTPUT_CHARS]}")
-    return "\n\n".join(parts)
-```
-
-### PM6 — El estilo de etiquetas y separadores es consistente entre todos los prompts
-
-El formato interno del mensaje de usuario (cómo se separan las secciones, cómo se etiquetan) debe ser uniforme en todos los `build_*_message()` del proyecto. Prompts con formatos distintos producen respuestas menos predecibles.
-
-```python
-# Elige un estilo y aplícalo en todos los build_*_message() del proyecto.
-# Ejemplo de estilo con etiquetas en MAYÚSCULAS y separador de doble newline:
-
-def build_evaluator_message(item: str, context: str = "") -> str:
-    parts = [f"ITEM:\n{item}"]
-    if context:
-        parts.append(f"CONTEXTO:\n{context[:_MAX_CONTEXT_CHARS]}")
-    return "\n\n".join(parts)   # ← separador consistente
-
-def build_router_message(query: str, candidates: list[str]) -> str:
-    parts = [
-        f"QUERY:\n{query}",
-        f"CANDIDATOS:\n" + "\n".join(f"- {c}" for c in candidates),
-    ]
-    return "\n\n".join(parts)   # ← mismo separador
-```
-
-### PM7 — Los prompts de sistema dinámicos usan `build_*_system_prompt()`
-
-Si el mensaje de sistema varía entre invocaciones (porque incluye una lista de candidatos, configuración por tenant, o contexto de sesión), su construcción vive en una función `build_*_system_prompt()` dedicada — no en un f-string en el callsite. La distinción entre la parte fija y la parte variable debe ser evidente en el código.
-
-```python
-# MAL — sistema construido con f-string en el punto de invocación;
-# imposible saber qué parte es fija y qué parte varía
-adapter.invoke(
-    f"Eres un router. Opciones disponibles: {', '.join(options)}. Elige una.",
-    user_message
-)
-
-# BIEN — función dedicada; la parte fija y la dinámica están separadas
-_ROUTER_SYSTEM_TEMPLATE = (
-    "Eres un router. Tu única tarea es elegir la opción más apropiada.\n"
-    "Responde SOLO un JSON: {{\"choice\": \"<nombre-exacto>\"}}."
-)
-
-def build_router_system_prompt(options: list[str]) -> str:
-    """El prompt de sistema incluye las opciones disponibles en esta invocación."""
-    options_block = "\n".join(f"- {opt}" for opt in options)
-    return f"OPCIONES DISPONIBLES:\n{options_block}\n\n{_ROUTER_SYSTEM_TEMPLATE}"
-```
+Ver T6. `[:4000]` dentro de una función de render es una decisión de diseño escondida en un literal.
 
 ---
 
-## Testing
+## 10. Pruebas
 
-La testabilidad es la justificación de media docena de reglas anteriores —dominio puro (G5), sin
-estado mutable al importar (P5), sin `SystemExit` fuera de `main()` (P3), funciones en vez de
-clases sin estado (OO6)—. Esta sección dice qué hacer con eso: **las pruebas se escriben desde el
-primer commit, no cuando el módulo «esté terminado»**.
-
-### T1 — El dominio puro se prueba sin dobles, sin disco y sin red
-
-Si una regla de negocio necesita un doble de test, un `tmp_path` o un servidor levantado, la regla
-no está en `domain/`: está mezclada con I/O y hay que separarla primero. Una prueba de dominio
-recibe datos y compara el resultado.
+### PR1 · El nombre de la prueba es una frase que describe el defecto
 
 ```python
-# MAL — la "prueba de dominio" necesita disco, así que la regla no es pura
-def test_skill_sin_description(tmp_path):
-    (tmp_path / "SKILL.md").write_text("---\nname: x\n---\n")
-    assert validate_repository(tmp_path).errors
-
-# BIEN — la regla recibe datos y devuelve hallazgos
-def test_sin_description_es_error():
-    findings = review_skill("x", "mi-skill", {"name": "mi-skill", "description": ""}, 10)
-    assert any("description" in f.message for f in findings)
+def test_la_entrada_rechaza_cuando_falta_el_entregable_del_anterior(node, workspace) -> None: ...
+def test_el_frente_no_traga_una_categoria_mal_escrita() -> None: ...
+def test_las_coordenadas_se_leen_del_pom_y_no_por_grep(tmp_path) -> None: ...
 ```
 
-### T2 — Cada prueba nombra el defecto que cubre, no la función que llama
+El nombre es lo único que se lee cuando la prueba falla en CI. `test_revisar_paso_3` no dice nada.
 
-El nombre de la prueba es lo único que se lee cuando falla en CI. `test_revisar_skill_caso_3` no
-dice nada; `test_allowed_tools_como_lista_es_error` dice exactamente qué se rompió y por qué
-importaba.
+### PR2 · La arquitectura se prueba, no solo se documenta
+
+Hay pruebas que recorren el código fuente y verifican su forma: que ningún paso siga siendo una
+firma, que cada paso exporte una sola función, que ninguno declare un tipo, que ninguno anide
+funciones. **Una regla de estructura sin prueba es una recomendación.** Las reglas E4, S3 y S6 son
+candidatas obvias.
+
+### PR3 · Toda prueba que recorre archivos cuenta cuántos encontró
 
 ```python
-# MAL — el nombre describe la mecánica
-def test_revisar_envelope_1(): ...
-def test_validador_ok(): ...
+STEPS = 213
 
-# BIEN — el nombre describe el defecto y su severidad
-def test_falta_cada_campo_del_envelope_produce_un_error(): ...
-def test_una_referencia_no_es_un_secreto(): ...
-def test_skill_muy_largo_es_aviso_y_no_bloquea(): ...
+def test_son_doscientos_trece() -> None:
+    assert len(found) == STEPS, "o falta alguno, o el recorrido dejó de mirar donde tenía que mirar"
 ```
 
-### T3 — Todo defecto medido se convierte en prueba de regresión
+El motivo lo dice el propio archivo, y es la mejor frase del repositorio: **«una regla verde y una
+muerta se ven igual»**. Sin el recuento, un `rglob` que deja de encontrar archivos pasa en verde sin
+mirar nada.
 
-Cuando una suposición se cae al ejecutarla —o un bug aparece en producción— la corrección incluye
-la prueba que lo fija. Sin ella, la siguiente persona que «simplifique» el código lo reintroduce
-sin enterarse. El comentario de la prueba dice **dónde se midió**, no solo qué comprueba.
+### PR4 · Lo que ya comprueba un comando se comprueba también en la suite
+
+El grafo de contratos tiene su propio comando, y además una prueba de una línea que lo llama: «un
+desarrollador no ejecuta un comando que no conoce, pero sí ejecuta la suite antes de empujar».
+
+### PR5 · El mensaje de la aserción dice qué hacer, no qué falló
+
+Las aserciones llevan mensaje con el conteo, los primeros elementos y la interpretación de las
+causas posibles.
+
+Corolario: una prueba comprueba **una cosa**, y su fallo señala una sola causa. Si el caso tiene
+varias variantes, se recorren en un bucle con el valor en el mensaje de la aserción, para que el
+fallo diga cuál.
+
+### PR6 · Los dobles se inyectan por argumento, no con `monkeypatch`
+
+Si la función recibe su dependencia externa como argumento (con un default sobreescribible cuando
+haga falta), la prueba sustituye el doble y no hace falta parchear módulos. El *monkeypatching* es
+una señal de que el cableado está escondido dentro de la función en vez de estar en la firma.
 
 ```python
-def test_version_no_semver_es_error():
-    # Medido al instalar el artefacto: `version: "1.0.0"` pierde las comillas al reescribirse; con
-    # `1.10` el valor se interpretaría como número y perdería el cero.
-    for bad_version in ("1.0", "v1.0.0", "1.10"):
-        assert _errors(review_envelope("x", {**ENVELOPE, "version": bad_version})), bad_version
-```
-
-### T4 — Los adaptadores se prueban con dobles inyectados, no con *monkeypatching*
-
-Si el caso de uso recibe sus adaptadores como argumentos con un default sobreescribible, la prueba
-inyecta un doble y no hace falta parchear módulos. El *monkeypatching* es una señal de que el
-cableado está oculto dentro de la función en vez de estar en la firma.
-
-```python
-# MAL — parchea el módulo importado; la prueba conoce la implementación interna
+# MAL · la prueba conoce la implementación interna
 def test_validar(monkeypatch):
-    monkeypatch.setattr("validator_bcp.adapters.repository.read", lambda *_: FAKE)
+    monkeypatch.setattr("migration.transform.adapters.repository.read", lambda *_: FAKE)
 
-# BIEN — el adaptador es un argumento con default; la prueba lo sustituye
-def validate(root, *, repository=repository_adapter): ...
+# BIEN · la dependencia es un argumento
+def validate(root: Path, *, repository=repository_adapter) -> Result: ...
 
-def test_validar_con_repositorio_falso():
+def test_la_validacion_usa_lo_que_le_da_el_repositorio():
     assert validate(Path("."), repository=FakeRepository()).is_conformant
 ```
 
-### T5 — Una prueba comprueba una cosa, y su fallo señala una sola causa
+Ojo con T4 de esta misma norma: **un presupuesto no lleva default**. La inyectabilidad con default
+vale para adaptadores, no para palancas de comportamiento.
 
-Una prueba con seis aserciones sobre aspectos distintos falla en la primera y esconde las otras
-cinco — el mismo problema que los gates que fallan rápido en vez de agregar. Si el caso genuinamente
-tiene varias variantes, se recorren en un bucle con el valor en el mensaje de la aserción.
+### PR7 · El código que decide si algo se publica tiene sus propias pruebas en CI
 
-```python
-# MAL — falla en la primera y oculta el resto
-def test_envelope():
-    assert not review_envelope("x", COMPLETE)
-    assert _errors(review_envelope("x", WITHOUT_ID))
-    assert _errors(review_envelope("x", WITHOUT_OWNER))
-
-# BIEN — el bucle dice cuál falló
-def test_falta_cada_campo_del_envelope_produce_un_error():
-    for field in ENVELOPE:
-        incomplete = {k: v for k, v in ENVELOPE.items() if k != field}
-        assert _errors(review_envelope("x", incomplete)), f"no se detectó la falta de {field}"
-```
-
-### T6 — El código que decide si algo se publica tiene sus propias pruebas en CI
-
-Un validador, un gate o un generador de índice son infraestructura de la que dependen todos los
-consumidores: si se rompen en silencio, dejan de proteger sin que nadie lo note. Sus pruebas corren
-en cada cambio que los toque, y son rápidas porque el dominio es puro.
+Un validador, un gate, un comprobador de contratos o un generador de índice son infraestructura de
+la que dependen todos los consumidores: si se rompen en silencio, dejan de proteger sin que nadie lo
+note. Sus pruebas corren en cada cambio que los toque.
 
 ```yaml
 on:
   pull_request:
-    paths: ["validador/**"]
+    paths: ["src/migration/**", "tests/**"]
 
 jobs:
   pruebas:
     steps:
-      - name: Ejecutar las pruebas del dominio
-        working-directory: validador
+      - name: Ejecutar la suite de contratos y estructura
         run: python -m pytest tests -q
 ```
 
 ---
 
-## Checklist de revisión
+## 11. Empaquetado
 
-Antes de hacer commit de cualquier cambio, verifica cada punto:
+### EP1 · `py.typed`, y se explica para qué
 
-**Arquitectura y responsabilidad**
-- [ ] Ningún módulo agrupa más de una responsabilidad (tests de conjunción y de grupos de G1).
-- [ ] Ningún archivo Python supera ~300 líneas sin dividirse o sin un comentario que justifique la cohesión.
-- [ ] Tras extraer concerns a módulos compartidos, se re-revisó el núcleo restante.
-- [ ] El código está en paquetes por capa (domain/application/ports/adapters); la raíz solo tiene entry points.
-- [ ] Se respeta la regla de dependencia: domain no importa adapters; application no importa adapters concretos salvo I/O de implementación única documentada.
-- [ ] No hay puertos abstractos con una sola implementación (puerto solo donde hay polimorfismo real).
-- [ ] Los identificadores nuevos están en inglés y la prosa en español (G3b). No se tocaron los cuatro identificadores del gate, los cinco workflows reutilizables ni las claves ya persistidas en Port o en los esquemas.
+Sin el marcador PEP 561, «un verificador de tipos IGNORA el paquete entero», y toda la maquinaria de
+contratos tipados solo comprobaría en ejecución.
 
-**Python**
-- [ ] Todos los imports están al inicio del archivo.
-- [ ] No hay `except Exception` sin justificación explícita en comentario.
-- [ ] No hay `SystemExit` fuera de `main()`.
-- [ ] Las funciones no mutan sus argumentos.
-- [ ] No hay I/O ni cómputo pesado en el top-level del módulo.
-- [ ] Los valores con opciones finitas usan `Enum`, no strings literales.
-- [ ] Los tipos de retorno son coherentes; no hay `tuple[bool, X]` con semántica variable.
-- [ ] Las funciones internas llevan prefijo `_`.
-- [ ] No hay lógica duplicada entre módulos del mismo proyecto.
-- [ ] Los comandos externos se construyen con listas, no con concatenación de strings.
-- [ ] Los umbrales/límites/topes/timeouts/rondas/top-N son constantes nombradas, no literales mágicos (P11); los defaults de flags de CLI se toman de esa constante.
+### EP2 · Las dependencias de prueba van en un extra
 
-**Diseño orientado a objetos**
-- [ ] Los datos estructurados que viajan entre funciones usan `@dataclass`, no `dict` o `tuple`.
-- [ ] Los errores de dominio tienen una jerarquía propia con excepción base del proyecto.
-- [ ] Los `if/elif` que crecen con nuevos tipos usan el patrón Strategy con `Protocol`.
-- [ ] El acceso a una fuente de datos compartida está centralizado en un Repository.
-- [ ] Los contratos entre componentes usan `Protocol`, no herencia de `ABC`.
-- [ ] No hay clases sin estado real — las funciones sin estado son funciones, no clases.
+Con el motivo escrito: ningún paso las usa, y arrastrarlas al runner sería «meter en el job una
+dependencia que nadie invoca».
 
-**Testing**
-- [ ] Las reglas de dominio se prueban sin disco, sin red y sin dobles (T1).
-- [ ] Cada prueba nombra el defecto que cubre, no la función que llama (T2).
-- [ ] Todo defecto medido tiene su prueba de regresión, con un comentario que dice dónde se midió (T3).
-- [ ] Los adaptadores se sustituyen por inyección, no con `monkeypatch` (T4).
-- [ ] Ninguna prueba encadena aserciones sobre aspectos distintos; las variantes van en bucle con mensaje (T5).
-- [ ] El código que decide si algo se publica —validadores, gates, generadores— tiene pruebas en CI (T6).
+### EP3 · Los recursos que el runner necesita se declaran o no llegan
 
-**Logging**
-- [ ] No hay `print(..., file=sys.stderr)` de diagnóstico — solo `log.*()`.
-- [ ] Cada módulo tiene `log = logging.getLogger(__name__)` al inicio.
-- [ ] El nivel de cada mensaje es correcto (DEBUG / INFO / WARNING / ERROR / CRITICAL).
-- [ ] El logging se configura una sola vez en `main()`, nunca en módulos de librería.
-- [ ] Todos los CLIs tienen el flag `--verbose` / `-v`.
-- [ ] Las excepciones se loggean con `exc_info=True`, no con f-strings manuales.
-- [ ] Los mensajes usan `%s`, no f-strings.
-- [ ] La salida estructurada va a `stdout`; el logging siempre a `stderr`.
+`package-data` lleva el certificado, y el comentario advierte que «lo que no se declare aquí no llega
+al runner».
 
-**Gestión de prompts**
-- [ ] No hay strings de prompt inline dentro de funciones.
-- [ ] Las constantes tienen sufijo `_SYSTEM_PROMPT` o `_USER_PROMPT`.
-- [ ] Los prompts dinámicos se construyen en funciones `build_*_message()` dedicadas.
-- [ ] Las funciones que invocan al LLM no construyen prompts — los reciben ya construidos.
-- [ ] Todos los prompts y funciones `build_*` están centralizados en `prompts.py`.
-- [ ] El formato de respuesta esperado está documentado antes de cada constante de prompt.
-- [ ] Los límites de contexto son constantes nombradas, no literales mágicos.
-- [ ] El estilo de etiquetas y separadores es consistente entre todos los `build_*_message()`.
+### EP4 · No se declara un entry point que no existe
 
-**YAML / GitHub Actions**
-- [ ] La lógica reutilizable entre workflows está en composite actions, no duplicada.
-- [ ] Las versiones de herramientas son variables, no literales hardcodeados.
-- [ ] Los inputs con defaults se resuelven una sola vez (env de job o step inicial).
-- [ ] Las ramas condicionales complejas son steps separados con `if:` de Actions.
-- [ ] Todos los paths son absolutos o consistentes con su `working-directory`.
-- [ ] Los steps con `continue-on-error` capturan y exponen su outcome.
-- [ ] Las exclusiones de globs son explícitas con `!`, no implícitas por estructura.
-- [ ] Los nombres de steps describen el resultado y el contexto, no solo la acción.
+El ejemplo retiró uno que llevaba tiempo reventando al invocarlo, y dejó escrito el diagnóstico:
+había «tres declaraciones del mismo entry point y solo dos coincidían».
 
 ---
 
-# Parte 2. Reglas de los componentes de este repositorio
+## 12. YAML / GitHub Actions
 
-## Reglas de repositorio
+Esta sección es ortogonal al resto: el código de ejemplo no dice nada de workflows, y los workflows
+son el otro lugar donde la duplicación silenciosa hace daño.
 
-- **Un workflow por evento, un job por responsabilidad.** Los llamadores de los dominios no llevan
-  lógica; los reutilizables piden permisos mínimos por job y los recibe del llamador. `@v1` para lo
-  propio, SHA para terceros. Ningún workflow supera 150 líneas sin justificación en su cabecera.
-- **SDD en cada capacidad.** Ninguna capacidad empieza por el código: `/speckit.specify`, `clarify`,
-  `checklist`, `plan`, `tasks`, `analyze`, `implement`. Una spec por capacidad, una rama
-  `feat/NNN-<nombre>` y un PR por spec, con la spec enlazada. La prosa de los skills y los documentos
-  de diseño se escriben a mano.
-- **Medición antes de construir.** Lo que dependa de un comportamiento de Copilot CLI, Claude Code o
-  GitHub se mide en el hito donde se necesita y la medición se convierte en prueba de regresión (T3).
-- **Sin em-dashes** en ningún documento ni comentario nuevo.
+### Y1 · La lógica reutilizable entre workflows vive en composite actions
 
-## Asistente de autoría (`plugins/authoring-assistant/`)
+Si dos workflows comparten lógica (instalación de dependencias, configuración de entorno, pasos de
+validación), esa lógica vive en `.github/actions/<nombre>/action.yml` y los workflows la invocan con
+`uses:`. Ninguna versión de herramienta ni parámetro de configuración se repite en dos archivos.
 
-- Identificadores en inglés, prosa en español (G3b). Los estados y campos que ya existen en el árbol de
-  decisión y las reglas de rama y versión (`main_clean`, `work_branch_clean`, `feat/`, `fix/`,
-  `deprecate/`, `risk_level`, entre otros) son contrato: no se renombran.
-- Cada script imprime un solo JSON en `stdout` y el diagnóstico en `stderr` (L8). Código de salida 0 si
-  pudo clasificar, aunque el estado sea de parada; distinto de 0 sólo si no pudo ejecutar.
-- Comandos de git permitidos a los scripts: `fetch`, `switch -c`, `add`, `commit` y `push` **sólo de la
-  rama `<accion>/<unidad>` actual**, y `gh pr create` sobre ella. Nunca `stash`, `reset`, `checkout` de
-  archivos ajenos ni nada sobre otra rama.
-- Todo script que escribe valida que el destino está bajo la raíz de la unidad elegida; ningún script
-  lee variables de entorno de credenciales; el que consulta herramientas de un servidor MCP lo arranca
-  sólo tras confirmación explícita del autor.
-- El dominio no importa `subprocess` ni `pathlib`: versión, riesgo, aprobadores y clasificación del
-  diff se prueban con datos, sin repositorio (T1).
-- La intención pendiente se guarda en `git config --local`: un clon nuevo no la hereda y en worktrees
-  compartidos conviene `--worktree`; queda documentado y probado.
-- El `SKILL.md` y los `references/` son prosa revisada a mano contra el árbol de decisión;
-  `/speckit.implement` produce código y pruebas, no la guía del diálogo.
+### Y2 · Las versiones de herramientas son variables, no literales
+
+```yaml
+# MAL
+run: npm install -g my-tool@1.2.3
+
+# BIEN
+env:
+  TOOL_VERSION: "1.2.3"
+run: npm install -g my-tool@${{ env.TOOL_VERSION }}
+```
+
+Si la misma versión aparece en más de un workflow, vive en un composite action o en una variable de
+repositorio.
+
+### Y3 · Las variables derivadas de inputs se resuelven una sola vez
+
+Si `${{ github.event.inputs.X || 'default' }}` aparece más de una vez en un job, resuélvelo en un
+step inicial o como `env` del job.
+
+### Y4 · Las ramas condicionales complejas son steps separados con `if:`
+
+Si un `run` contiene más de un `if/elif/else` de bash, o si la condición depende de outputs de steps
+anteriores, divide en steps con `if:` de Actions. Cada rama tiene un nombre visible en la UI.
+
+```yaml
+- name: Transform · PR, alcance acotado por diff
+  if: github.event_name == 'pull_request'
+  run: tool --scope "${{ steps.scope.outputs.items }}"
+
+- name: Transform · manual, todos los microservicios
+  if: github.event_name == 'workflow_dispatch' && github.event.inputs.all == 'true'
+  run: tool --all
+```
+
+### Y5 · Los paths son absolutos o consistentes con su `working-directory`
+
+Cuando un step escribe en un path y otro lee de él, ambos usan la misma expresión. Mezclar paths
+relativos con distintos `working-directory` genera bugs silenciosos donde el directorio existe pero
+está vacío.
+
+```yaml
+- name: Transform
+  working-directory: src/migration
+  run: tool --output "$GITHUB_WORKSPACE/reports"
+
+- name: Leer los resultados
+  run: cat "$GITHUB_WORKSPACE/reports/output.json"
+```
+
+### Y6 · Los steps con `continue-on-error` registran su outcome
+
+Si un step usa `continue-on-error: true`, su outcome se captura y se propaga (al mensaje de commit,
+al summary o a un output del job). Un fallo silencioso que no deja rastro es un problema de
+observabilidad.
+
+### Y7 · Las exclusiones en globs son explícitas con `!`
+
+```yaml
+# MAL · excluye por la profundidad del glob
+path: reports/*/*.json
+
+# BIEN
+path: |
+  reports/*/*.json
+  !reports/meta.json
+```
+
+### Y8 · Los nombres de steps describen el resultado y el contexto
+
+Un step llamado `Run` o `Install` no distingue entre instancias del mismo tipo. El nombre debe ser
+autoexplicativo en la UI sin abrir el log: `Install dependencias del proveedor (${{ env.PROVIDER }})`,
+`Checkout histórico de resultados (read-only)`.
+
+---
+
+## 13. Checklist de revisión
+
+**Estructura**
+- [ ] El paquete está bajo `src/` y el adaptador de la línea de órdenes fuera del paquete. (E1)
+- [ ] Cada proceso tiene las mismas cuatro bandas, con `steps/` y un archivo por paso. (E2, E4)
+- [ ] Los archivos que componen no calculan ni bifurcan. (E3)
+- [ ] Cada paso exporta una sola función. (E4)
+- [ ] Lo compartido está en el `commons/` del nivel que le toca, ni más arriba ni más abajo. (E5)
+- [ ] Ningún módulo agrupa más de una responsabilidad; ninguno cruza ~300 líneas en silencio. (E6)
+
+**Contratos**
+- [ ] Cada nodo declara su contrato en un archivo aparte del código que lo cumple. (C1)
+- [ ] Pydantic en la frontera exterior; `dataclass(frozen=True, slots=True)` para lo que viaja dentro. (C2)
+- [ ] Nada se parsea dos veces: se transporta el modelo. (C3)
+- [ ] Cada convención (rutas, nombres) se escribe una sola vez. (C4)
+- [ ] Hay una comprobación que cruza lo declarado con lo implementado sin ejecutar. (C5)
+- [ ] Cada clave del contrato declara quién la lee. (C6)
+- [ ] El verificador nombra y enruta; no repara. (C7)
+
+**Pasos y funciones**
+- [ ] El docstring abre con número, determinismo y capacidad. (S1)
+- [ ] El número de paso no está en el nombre del archivo. (S2)
+- [ ] Ningún paso declara tipos, anida funciones ni queda en `NotImplementedError`. (S3)
+- [ ] El docstring dice también lo que el paso NO hace. (S5)
+- [ ] El nombre declara el efecto: `write_*`/`save_*` para lo que escribe, `is_*`/`has_*` para predicados. (S6)
+- [ ] Ninguna función muta sus argumentos, salvo que mutar sea su propósito declarado. (P4)
+- [ ] Las funciones internas llevan prefijo `_` y están a nivel de módulo. (P8)
+- [ ] No hay `except Exception` sin justificación escrita. (P2)
+- [ ] No hay `SystemExit` fuera de `main()`. (P3)
+- [ ] No hay I/O ni cómputo pesado en el top-level. (P5)
+- [ ] Los tipos de retorno son coherentes; no hay `tuple[bool, X]` con semántica variable. (P7)
+- [ ] Los comandos externos se construyen con listas. (P10)
+
+**Tipos y presupuestos**
+- [ ] Los conjuntos cerrados son `StrEnum` (o `Enum` si no salen del proceso), no cadenas. (T1)
+- [ ] Dos familias parecidas siguen separadas. (T2)
+- [ ] Las listas que no deben crecer solas se escriben con sus miembros. (T3)
+- [ ] Los presupuestos se deciden donde se tiene la vista y bajan por la firma **sin default**. (T4)
+- [ ] Los presupuestos que cuentan cosas distintas no se llaman parecido. (T5)
+- [ ] Umbrales, topes, timeouts, rondas, top-N y truncados son constantes nombradas. (T6)
+
+**Imports**
+- [ ] `from __future__ import annotations` en todos los módulos. (I1)
+- [ ] Lo que solo se usa para tipar va en `TYPE_CHECKING` con `# pragma: no cover`. (I2)
+- [ ] `__all__` explícito. (I3)
+- [ ] Import por nombre completo, sin alias. (I4)
+- [ ] Todos los imports al inicio; el que no, lleva su motivo escrito encima. (P1)
+
+**Comentarios e idioma**
+- [ ] Los comentarios explican por qué, y por qué no. (D1)
+- [ ] Las correcciones dejan constancia de dónde se midieron. (D2)
+- [ ] El docstring del módulo tiene secciones y cita su fuente. (D3)
+- [ ] Lo pendiente o sin decidir se dice en el sitio. (D4)
+- [ ] Identificadores en inglés, prosa en español; sin tocar los cuatro identificadores del gate, los cinco workflows reutilizables ni las claves persistidas. (D5)
+
+**Errores**
+- [ ] Los errores de dominio cuelgan de una única excepción base del proyecto. (X1)
+- [ ] Las comprobaciones devuelven hallazgos; solo lo que impide continuar lanza. (X2)
+
+**Logging**
+- [ ] No hay `print` de diagnóstico; los `print` que quedan son salida que alguien consume. (L1, L8)
+- [ ] Cada módulo tiene `log = logging.getLogger(__name__)`. (L2)
+- [ ] El nivel de cada mensaje es el correcto. (L3)
+- [ ] El logging se configura una sola vez en `main()`. (L4)
+- [ ] Todos los CLIs tienen `--verbose` / `-v`. (L5)
+- [ ] Las excepciones se loggean con `exc_info=True`. (L6)
+- [ ] Los mensajes usan `%s`, no f-strings. (L7)
+- [ ] La salida estructurada va a `stdout`; el logging a `stderr`. (L8)
+- [ ] El formato se decide por entorno, dentro de la función de configuración. (L9)
+
+**Prompts**
+- [ ] El prompt se genera desde el contrato; nada que se le pida al modelo está escrito solo en el prompt. (PM1)
+- [ ] Una sola función de render, con la variación por parámetro. (PM2)
+- [ ] Al prompt solo entra lo que el modelo tiene que juzgar o puede reparar. (PM3)
+- [ ] El formato de respuesta esperado está documentado junto al prompt. (PM4)
+- [ ] Los límites de truncado son constantes nombradas. (PM5)
+
+**Pruebas**
+- [ ] El nombre de la prueba describe el defecto, en prosa. (PR1)
+- [ ] Las reglas de estructura tienen prueba. (PR2)
+- [ ] Toda prueba que recorre archivos cuenta cuántos encontró. (PR3)
+- [ ] Lo que comprueba un comando se comprueba también en la suite. (PR4)
+- [ ] El mensaje de la aserción dice qué hacer; las variantes van en bucle. (PR5)
+- [ ] Los dobles se inyectan por argumento, no con `monkeypatch`. (PR6)
+- [ ] Validadores, gates y generadores tienen pruebas que corren en CI. (PR7)
+
+**Empaquetado**
+- [ ] `py.typed` declarado. (EP1)
+- [ ] Dependencias de prueba en un extra. (EP2)
+- [ ] Recursos que el runner necesita, declarados. (EP3)
+- [ ] Ningún entry point declarado que no exista. (EP4)
+
+**YAML / GitHub Actions**
+- [ ] La lógica reutilizable está en composite actions. (Y1)
+- [ ] Las versiones de herramientas son variables. (Y2)
+- [ ] Los inputs con defaults se resuelven una sola vez. (Y3)
+- [ ] Las ramas condicionales complejas son steps con `if:`. (Y4)
+- [ ] Los paths son absolutos o consistentes con su `working-directory`. (Y5)
+- [ ] Los steps con `continue-on-error` exponen su outcome. (Y6)
+- [ ] Las exclusiones de globs son explícitas con `!`. (Y7)
+- [ ] Los nombres de steps describen resultado y contexto. (Y8)
+
+---
+
+## 14. Lo que este estándar no adopta, y por qué
+
+Cuatro patrones habituales que aquí quedan fuera. Están escritos para que nadie los introduzca
+creyendo que corrige un descuido.
+
+**La arquitectura hexagonal por capas (`domain/`, `application/`, `ports/`, `adapters/`).** Queda
+fuera por decisión explícita. Aquí se organiza **por proceso y banda**, y dentro de cada banda por
+paso (E2). Las dos disposiciones separan lo puro de lo que toca el mundo, pero por ejes distintos, y
+mezclarlas daría una estructura que no se deduce de la ruta, que es justo lo que E2 compra. La
+estructura definitiva es una decisión posterior; hasta entonces, se sigue E2.
+
+**Strategy con `Protocol`, Repository y `Protocol` sobre `ABC`.** Los tres empujan hacia la
+indirección, y la esencia de este código es la contraria: una función por paso, sin polimorfismo,
+sin interfaces con un solo implementador. En 213 pasos no hay ninguna jerarquía de estrategias, y lo
+que en otro diseño sería un Repository aquí es un módulo de rutas escrito una sola vez (C4). Una
+interfaz con un único implementador es indirección sin beneficio, y aquí la uniformidad la da la
+**forma de los archivos**, no una clase base.
+
+**`@dataclass` como respuesta única para los datos estructurados.** No se descarta por estar mal,
+sino porque C2 da un criterio más fino: pydantic en la frontera exterior, `dataclass(frozen=True,
+slots=True)` para lo que viaja dentro de un proceso, y `NamedTuple` para tuplas pequeñas y
+posicionales. «Usa dataclass» no dice dónde acaba la validación y empieza la estructura; C2 sí.
+
+**Centralizar los prompts en un `prompts.py`.** El ejemplo lo resuelve mejor y
+está verificado en el código: `build_agent_prompt(ANALYZE_CONTRACT, context_block, findings)` en
+`commons/artifact_contract.py`, invocado desde
+`analyze/orchestration_sub_process/steps/render_context_into_prompt.py`. El bloque de exigencias del
+prompt lo renderiza `describe_contract_for_prompt()` **a partir del mismo `NodeContract` que la banda
+de salida verifica**, de modo que lo que se le pide al modelo y lo que se le comprueba después no
+pueden divergir. Centralizar cadenas de texto en un módulo no da esa garantía: dos cadenas
+centralizadas divergen igual que dos dispersas. Lo que sí se exige, en PM4 y PM5, es documentar el
+formato de respuesta esperado y nombrar los truncados: las dos cosas son ortogonales a dónde vive
+el prompt.

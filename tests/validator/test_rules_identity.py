@@ -69,8 +69,21 @@ def test_un_campo_fuera_del_formato_de_identidad_es_error():
     assert "identity.manifest-unknown-fields" in _rules(snap)
 
 
-def test_una_identidad_sin_schema_es_error():
-    # El $schema del manifiesto sí es público y resuelve desde el editor, al contrario que el del
-    # gobierno, que por eso lleva schema_version (D5).
+def test_el_schema_de_agent_plugins_esconde_los_agentes_y_es_error():
+    # Medido el 18 de septiembre de 2026 con causalidad, cambiando sólo el manifiesto de la misma
+    # unidad: con ese `$schema`, Copilot busca los agentes en `com.github.copilot/agents` y responde
+    # `No such agent`; sin él, el agente contesta. El estándar lo exigía, así que TODA unidad creada
+    # con las plantillas nacía con el defecto y el gate la aprobaba.
+    snap = snapshot(manifest={
+        "name": UNIT_NAME,
+        "version": "0.1.0",
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+    })
+    assert "identity.manifest-schema-hides-agents" in _rules(snap)
+
+
+def test_una_identidad_sin_schema_es_valida():
+    # El validador carga su esquema del paquete y nunca lee `$schema` del archivo: ese campo sólo
+    # servía al editor, y en BCP no resuelve.
     snap = snapshot(manifest={"name": UNIT_NAME, "version": "0.1.0"})
-    assert "identity.manifest-schema-missing" in _rules(snap)
+    assert "identity.manifest-schema-hides-agents" not in _rules(snap)

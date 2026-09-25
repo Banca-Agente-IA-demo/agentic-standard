@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "Herramientas del equipo de plataforma del estándar agéntico (no se distribuyen)"
 # 3.11 es el suelo declarado por la constitución hasta medir el Python de BCP (hito A0).
 requires-python = ">=3.11"
-dependencies = []
+# pydantic lo exige C2 para la frontera exterior: el payload del formulario de Port entra al sistema
+# de tipos desde fuera, y `model_validate()` falla en el sitio y con el nombre del campo en vez de
+# tres funciones más tarde. Es dependencia de EJECUCIÓN porque el sembrador corre en el runner.
+dependencies = ["pydantic>=2.6"]
 
 [project.optional-dependencies]
 # jsonschema valida los contratos de schemas/ en las pruebas. Es dependencia de DESARROLLO: los

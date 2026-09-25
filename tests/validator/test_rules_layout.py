@@ -47,8 +47,25 @@ def test_un_artefacto_fuera_de_su_carpeta_es_error():
         assert "layout.artifact-outside-its-directory" in _rules(snapshot(files=(ruta,))), tipo
 
 
-def test_una_unidad_individual_lleva_su_artefacto_en_la_raiz_y_no_es_error():
+def test_un_skill_individual_en_la_raiz_no_es_error():
+    # Medido el 16 de septiembre de 2026 (experimento 6): el SKILL.md en la raíz de la unidad carga y
+    # responde en los dos clientes. Es una de las dos excepciones, junto con el .mcp.json.
     assert _rules(snapshot(files=("SKILL.md", "GOVERNANCE.json"))) == []
+    assert _rules(snapshot(files=(".mcp.json", "GOVERNANCE.json"))) == []
+
+
+def test_un_artefacto_aplanado_en_la_raiz_de_una_unidad_individual_es_error():
+    # Medido el 16 de septiembre de 2026 (experimento 6) en Claude Code 2.1.272 y Copilot CLI 1.0.85:
+    # estas tres formas INSTALAN con mensaje de éxito y no cargan nada, y ningún cliente avisa. El
+    # control las dejaba pasar porque saltaba todo lo que estuviera en la raíz de la unidad.
+    casos = {
+        "un agente": "demo.agent.md",
+        "un prompt": "demo.prompt.md",
+        "unos hooks": "hooks.json",
+    }
+    for tipo, ruta in casos.items():
+        reglas = _rules(snapshot(files=(ruta, "GOVERNANCE.json")))
+        assert "layout.artifact-flattened-at-root" in reglas, tipo
 
 
 def test_unos_hooks_sin_pruebas_son_error():

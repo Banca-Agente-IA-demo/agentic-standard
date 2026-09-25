@@ -25,24 +25,26 @@ TEST_VALUES = {
     "<<VERSION>>": "0.1.0-beta.1",
     "<<DESCRIPTION>>": "Unidad de prueba.",
     "<<TEAM>>": "squad-demo",
-    "<<CONTACT>>": "squad-demo@bcp.com.pe",
-    "<<EXTERNAL_CONTENT>>": "No procesa contenido externo.",
+    "<<TEAM_MAILBOX>>": "squad-demo@bcp.com.pe",
+    # `high` y no `medium`: la unidad de prueba que instancian las plantillas lleva servidor MCP con
+    # credenciales, y eso da un mínimo calculado de `high`. El campo sólo puede elevar, así que este
+    # valor vale para todas las plantillas, con servidor y sin él.
+    "<<RISK_LEVEL>>": "high",
     "<<SERVER>>": "jira",
     # El `selfcheck.py` del paquete de diseño no instanciaba `.mcp.json`, así que este marcador no
     # tenía valor de prueba; lo descubrió esta suite al ampliar la instanciación a esa plantilla.
     "<<URL>>": "https://jira.bcp.com.pe/mcp",
     "<<CREDENTIAL>>": "JIRA_TOKEN",
-    "<<CUSTODIAN_TEAM>>": "plataforma-atlassian",
-    "<<ACCESS_REQUEST_URL>>": "https://servicedesk.bcp.com.pe/accesos/jira-api",
-    "<<TOOLS_DIGEST>>": "0" * 64,
+    "<<ACCOUNTABLE_TEAM>>": "platform-atlassian",
+    # `<<TOOLS_DIGEST>>` se retiró el 17 de septiembre de 2026: el digest dejó de ser un marcador de
+    # plantilla al mudarse dentro de `tools_contract`, que escribe entero el asistente y la plantilla
+    # ya no emite. Un marcador para algo que nadie teclea sugería que alguien debía teclearlo.
 }
 
-# Plantillas estructuradas: las que se instancian entero y se validan.
+# Plantillas estructuradas: las que se instancian entero y se validan. El manifiesto es UNO para las
+# dos formas de unidad, porque lo único que cambia entre ellas es el directorio de destino.
 STRUCTURED_TEMPLATES = (
-    "plugin-unit/GOVERNANCE.json",
-    "plugin-unit/.claude-plugin/plugin.json",
-    "individual-unit/GOVERNANCE.json",
-    "individual-unit/.claude-plugin/plugin.json",
+    "unit/plugin.json",
     "artifacts/mcp/mcp-governance-block.json",
     "artifacts/mcp/.mcp.json",
 )

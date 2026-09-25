@@ -15,9 +15,11 @@ from agentic_validator.domain.standard import (
     PORTABLE_HOOK_EVENTS,
 )
 
-# El campo que la demo anterior aceptaba «durante la migración» y que no existe en el formato. Aquí es
-# error desde el primer día: la organización nace limpia.
-INVENTED_TIMEOUT_FIELD = "timeoutSec"
+# El tope tiene dos nombres y sólo uno funciona en los dos clientes. `timeoutSec` es el nombre canónico
+# de Copilot, que admite `timeout` como alias y le da precedencia a `timeoutSec`; Claude Code sólo
+# conoce `timeout` e ignora el otro. Una acción con sólo `timeoutSec` se queda SIN TOPE en Claude Code,
+# que es justo lo que el campo pretendía evitar, así que el estándar exige `timeout`.
+NON_PORTABLE_TIMEOUT_FIELD = "timeoutSec"
 
 # Un comando que trae algo de la red en tiempo de ejecución se salta el sello por completo (C5).
 _DOWNLOADERS = ("curl", "wget", "iwr", "invoke-webrequest")
@@ -67,12 +69,12 @@ def check_hook_timeouts(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
     """Un hook sin tope puede colgar el cliente de quien lo instale."""
     findings: list[Finding] = []
     for event, action in command_actions(snapshot):
-        if INVENTED_TIMEOUT_FIELD in action:
+        if NON_PORTABLE_TIMEOUT_FIELD in action:
             findings.append(
                 error(
-                    "hooks.invented-timeout-field",
+                    "hooks.non-portable-timeout-field",
                     HOOKS_FILE,
-                    f"el hook de {event} usa {INVENTED_TIMEOUT_FIELD!r}, que no existe en el formato; el campo es 'timeout'",
+                    f"el hook de {event} usa {NON_PORTABLE_TIMEOUT_FIELD!r}, que Claude Code no conoce: la acción quedaría sin tope. El campo portable es 'timeout'",
                 )
             )
         timeout = action.get("timeout")

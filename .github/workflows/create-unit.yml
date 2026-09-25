@@ -1,0 +1,187 @@
+# Creación: siembra el esqueleto de una unidad nueva en su rama de trabajo, desde el formulario de
+# autoservicio de Port.
+#
+# Es el flujo 0, anterior al registro. Escribe en el repositorio del dominio y habla con el catálogo,
+# así que a diferencia de `register` necesita permiso de escritura y las credenciales de Port.
+#
+# FIRMA PARA QUIEN LO INVOCA:
+#
+#   permiso            job           por qué
+#   contents: write    create-unit   crear la rama feat/<unidad> y empujar el esqueleto
+#
+#   secreto                job                          por qué
+#   PORT_CLIENT_ID         validate-payload, los tres   consultar el catálogo e informar
+#   PORT_CLIENT_SECRET     validate-payload, los tres   idem
+#
+# El llamador debe conceder exactamente eso. Los permisos del llamado solo se pueden mantener o
+# reducir, nunca elevar: si concede menos, la ejecución muere en el arranque sin mensaje útil.
+#
+# POR QUÉ TRES JOBS Y NO UNO. Validar y crear son responsabilidades distintas, y separarlas permite
+# que el job de error arranque sobre un job que terminó EN VERDE con el veredicto en false. Un
+# payload inválido no es un fallo del workflow: es una respuesta.
+#
+# LAS PLANTILLAS Y EL CÓDIGO NO SE CLONAN: llegan dentro de las composite actions, porque un
+# reutilizable no puede leer archivos de su propio repositorio.
+#
+# POR QUÉ SUPERA LAS 150 LÍNEAS. El archivo describe tres jobs y la mitad de su extensión son los
+# comentarios que explican las decisiones medidas. Partirlo en tres archivos escondería en qué orden
+# ocurren las cosas, que es lo único que este workflow aporta: la lógica ya está fuera, en las
+# actions y en el código que instalan. Quien busque qué se comprueba o cómo se siembra no lo
+# encuentra aquí ni debe.
+name: create-unit
+
+on:
+  workflow_call:
+    inputs:
+      payload:
+        description: JSON con el formulario que envió Port.
+        required: true
+        type: string
+      port_run_id:
+        description: Identificador de la ejecución en Port, para devolverle el estado.
+        required: false
+        type: string
+        default: ""
+    secrets:
+      PORT_CLIENT_ID:
+        required: true
+      PORT_CLIENT_SECRET:
+        required: true
+    outputs:
+      unit-name:
+        description: El nombre de la unidad sembrada.
+        value: ${{ jobs.create-unit.outputs.unit-name }}
+      branch:
+        description: La rama donde quedó el esqueleto.
+        value: ${{ jobs.create-unit.outputs.branch }}
+permissions: {}
+
+jobs:
+  validate-payload:
+    name: validate-payload
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    # Las credenciales van al nivel del JOB y no al del step. Un `env:` sobre un step que invoca una
+    # composite action no está garantizado que llegue a los pasos de dentro; el del job sí, y es
+    # donde de verdad hacen falta.
+    env:
+      PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
+      PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}
+    outputs:
+      status: ${{ steps.check.outputs.status }}
+      reason: ${{ steps.check.outputs.reason }}
+      unit-name: ${{ steps.check.outputs.unit-name }}
+      normalized-payload: ${{ steps.check.outputs.normalized-payload }}
+    steps:
+      - name: Guardar el formulario en un archivo
+        # El payload va a un archivo y no a la línea de órdenes: un JSON con comillas y saltos de
+        # línea no se escapa igual en cada shell, y un escapado que falla no da error, da OTRO JSON.
+        env:
+          PAYLOAD: ${{ inputs.payload }}
+        run: printf '%s' "$PAYLOAD" > "$RUNNER_TEMP/payload.json"
+
+      - name: Comprobar la forma del payload y que el nombre esté libre
+        id: check
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/validate-payload@v1
+        with:
+          payload-file: ${{ runner.temp }}/payload.json
+
+  report-error:
+    name: report-error
+    needs: validate-payload
+    if: needs.validate-payload.outputs.status != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
+      PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}
+    steps:
+      - name: Devolver el motivo a quien rellenó el formulario
+        if: inputs.port_run_id != ''
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@v1
+        with:
+          run-id: ${{ inputs.port_run_id }}
+          status: FAILURE
+          summary: ${{ needs.validate-payload.outputs.reason }}
+
+      - name: Dejar el motivo también en el resumen de la ejecución
+        run: |
+          set -euo pipefail
+          {
+            echo "### La unidad no se creó"
+            echo ''
+            echo "${{ needs.validate-payload.outputs.reason }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  create-unit:
+    name: create-unit
+    needs: validate-payload
+    if: needs.validate-payload.outputs.status == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
+      PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}
+    outputs:
+      unit-name: ${{ needs.validate-payload.outputs.unit-name }}
+      branch: ${{ steps.branch.outputs.name }}
+    steps:
+      - name: Checkout del repositorio de dominio, donde vivirá la unidad
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolver el nombre de la rama
+        # Se resuelve una sola vez y viaja como output: la misma expresión repetida en tres steps son
+        # tres sitios donde puede divergir.
+        id: branch
+        env:
+          UNIT_NAME: ${{ needs.validate-payload.outputs.unit-name }}
+        run: echo "name=feat/$UNIT_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Crear la rama de trabajo de la unidad
+        # Falla si la rama ya existe, y fallar es lo correcto: enviar el formulario dos veces para la
+        # misma unidad debe fallar en voz alta y nunca sobrescribir.
+        run: git switch -c "${{ steps.branch.outputs.name }}"
+
+      - name: Guardar el payload normalizado en un archivo
+        env:
+          NORMALIZED: ${{ needs.validate-payload.outputs.normalized-payload }}
+        run: printf '%s' "$NORMALIZED" > "$RUNNER_TEMP/payload.json"
+
+      - name: Sembrar el esqueleto desde las plantillas del estándar
+        id: seed
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/seed-unit@v1
+        with:
+          payload-file: ${{ runner.temp }}/payload.json
+          root: .
+
+      - name: Publicar la rama con el esqueleto
+        env:
+          UNIT_NAME: ${{ needs.validate-payload.outputs.unit-name }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "feat($UNIT_NAME): esqueleto sembrado desde el autoservicio de Port"
+          git push --set-upstream origin "$BRANCH"
+
+      - name: Devolver el resultado a quien rellenó el formulario
+        if: inputs.port_run_id != ''
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@v1
+        with:
+          run-id: ${{ inputs.port_run_id }}
+          status: SUCCESS
+          summary: "La unidad ${{ needs.validate-payload.outputs.unit-name }} se sembro en la rama ${{ steps.branch.outputs.name }}."
+
+      - name: Retirar la rama si algo falló después de publicarla
+        # O existen la rama y su aviso, o no existe ninguna de las dos. Una rama sin nada que la
+        # explique es indistinguible de una unidad abandonada.
+        if: failure()
+        env:
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: git push origin --delete "$BRANCH" || true

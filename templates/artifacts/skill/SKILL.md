@@ -12,9 +12,12 @@ metadata:
   regla de identidad que la especificación impone, y si no coinciden el cliente no encuentra el skill,
   sin error, simplemente no aparece.
 
+  EL NOMBRE NO ADMITE PUNTOS, a diferencia del agente y del prompt: su forma la fija la especificación
+  de Agent Skills, y el nombre es además el del directorio.
+
   EL FRONTMATTER SÓLO LLEVA LO QUE EL CLIENTE LEE más el mapa `metadata:` de catálogo. Nada de gobierno:
-  ni id, ni owner, ni version, ni status, ni clasificación. Todo eso vive en el GOVERNANCE.json y en el
-  plugin.json de la unidad, y el validador FALLA si reaparece aquí («vive en GOVERNANCE.json»).
+  ni id, ni owner, ni version, ni status, ni clasificación. Todo eso vive en `metadata.governance` del
+  plugin.json de la unidad, y el validador FALLA si reaparece aquí.
 
   `metadata:` ES OPCIONAL y es texto a texto, como lo define la especificación Agent Skills. Sirve para
   que Port filtre. Claves admitidas: `tags` (lista separada por comas), `platform_source`,

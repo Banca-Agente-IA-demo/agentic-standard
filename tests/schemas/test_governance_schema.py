@@ -79,24 +79,65 @@ def test_dos_servidores_en_permissions_mcp_servers_es_error(governance_validator
     assert any("too long" in e for e in errors_of(governance_validator, bad))
 
 
-def test_credenciales_declaradas_sin_custodio_es_error(governance_validator, complete_governance):
-    # D2: sin custodio, quien instala acaba pidiendo el acceso a ciegas.
+def test_el_equipo_responsable_es_un_slug_y_no_un_objeto(governance_validator, complete_governance):
+    # Medido el 16 de septiembre de 2026: el esquema lo tenía como objeto con team y
+    # access_request_url, y el contrato lo define como un texto. La URL es propiedad del equipo
+    # custodio y no de la unidad: se repetiría en cada unidad que use el mismo servidor, y un release
+    # es inmutable mientras que una dirección de ITSM no.
     bad = copy.deepcopy(complete_governance)
-    del bad["mcp"]["jira"]["credentials_owner"]
-    assert any("credentials_owner" in e for e in errors_of(governance_validator, bad))
+    bad["mcp"]["jira"]["accountable_team"] = {"team": "platform-atlassian",
+                                              "access_request_url": "https://ejemplo/acceso"}
+    assert errors_of(governance_validator, bad)
 
 
-def test_un_servidor_sin_credenciales_no_necesita_custodio(governance_validator, complete_governance):
-    ok = copy.deepcopy(complete_governance)
-    ok["mcp"]["jira"]["credentials"] = []
-    del ok["mcp"]["jira"]["credentials_owner"]
-    assert errors_of(governance_validator, ok) == []
-
-
-def test_tools_digest_sin_el_prefijo_sha256_es_error(governance_validator, complete_governance):
+def test_un_servidor_sin_equipo_responsable_es_error(governance_validator, complete_governance):
+    # Decidido el 17 de septiembre de 2026: TODO servidor declara quién responde por él, tenga
+    # credenciales o no. Antes se eximía a los servidores sin autenticación, y eso dejaba entrar
+    # endpoints externos sin que nadie los avalara.
     bad = copy.deepcopy(complete_governance)
-    bad["mcp"]["jira"]["tools_digest"] = "3f9a" * 16
+    del bad["mcp"]["jira"]["accountable_team"]
+    assert any("accountable_team" in e for e in errors_of(governance_validator, bad))
+
+
+def test_no_se_declaran_las_credenciales_que_el_servidor_necesita(governance_validator,
+                                                                  complete_governance):
+    # El array `credentials` se retiró el 16 de septiembre de 2026: repetía los ${VAR} que ya están en
+    # el .mcp.json, y su regla de que una lista no vacía eleva el riesgo mínimo contradecía que
+    # risk_level no derive nada.
+    bad = copy.deepcopy(complete_governance)
+    bad["mcp"]["jira"]["credentials"] = ["JIRA_TOKEN"]
+    assert errors_of(governance_validator, bad)
+
+
+def test_falta_risk_level_es_error(governance_validator, complete_governance):
+    # Obligatorio desde el 16 de septiembre de 2026: un campo de catálogo que la mitad de las unidades
+    # no trae deja la pregunta «cuántas unidades de riesgo alto hay» con una respuesta parcial que
+    # parece completa.
+    bad = {k: v for k, v in complete_governance.items() if k != "risk_level"}
+    assert any("risk_level" in e for e in errors_of(governance_validator, bad))
+
+
+def test_el_digest_sin_el_prefijo_sha256_es_error(governance_validator, complete_governance):
+    bad = copy.deepcopy(complete_governance)
+    bad["mcp"]["jira"]["tools_contract"]["digest"] = "3f9a" * 16
     assert any("does not match" in e for e in errors_of(governance_validator, bad))
+
+
+def test_falta_cada_pieza_de_lo_observado_produce_un_error(governance_validator, complete_governance):
+    # Las tres salen de la misma consulta al servidor. Que falte una significa que el bloque se
+    # escribió a mano, que es justo lo que se quiso impedir el 17 de septiembre de 2026.
+    for field in ("digest", "write_operations", "observed_at"):
+        bad = copy.deepcopy(complete_governance)
+        del bad["mcp"]["jira"]["tools_contract"][field]
+        assert errors_of(governance_validator, bad), f"no se detectó la falta de {field}"
+
+
+def test_write_operations_fuera_de_lo_observado_es_error(governance_validator, complete_governance):
+    # Suelto entre campos que teclea una persona parecía tecleable, y la plantilla lo confirmaba
+    # dándole un `false` por defecto que llegaba a la solicitud sin que nadie mirara el servidor.
+    bad = copy.deepcopy(complete_governance)
+    bad["mcp"]["jira"]["write_operations"] = False
+    assert any("Additional properties" in e for e in errors_of(governance_validator, bad))
 
 
 def test_el_bloque_approval_de_la_demo_dentro_de_mcp_es_error(governance_validator, complete_governance):
@@ -112,9 +153,10 @@ def test_risk_level_fuera_del_enumerado_es_error(governance_validator, complete_
 
 
 def test_falta_cada_campo_de_deprecation_produce_un_error(governance_validator, minimal_governance):
-    # D6: los tres son obligatorios cuando el bloque existe; un campo ausente no distinguiría una
-    # decisión de un olvido.
-    for field in ("superseded_by", "sunset_date", "decided_by"):
+    # D6: los dos son obligatorios cuando el bloque existe; un campo ausente no distinguiría una
+    # decisión de un olvido. `decided_by` se retiró el 16 de septiembre de 2026: quién decidió es un
+    # hecho que vive en la aprobación de la solicitud de cambio, no un campo que alguien teclea.
+    for field in ("superseded_by", "sunset_date"):
         bad = copy.deepcopy(minimal_governance)
         del bad["deprecation"][field]
         errors = errors_of(governance_validator, bad)
@@ -139,7 +181,10 @@ def test_un_contacto_que_no_es_correo_es_error(governance_validator, complete_go
     assert any("email" in e for e in errors_of(governance_validator, bad))
 
 
-def test_x_extensions_admite_cualquier_contenido(governance_validator, complete_governance):
-    # Es la válvula de escape declarada: lo exclusivo de un cliente cabe aquí sin validación.
-    ok = {**complete_governance, "x_extensions": {"copilot": {"hooks": ["userPromptSubmitted"]}}}
-    assert errors_of(governance_validator, ok) == []
+def test_el_esquema_esta_cerrado_y_no_hay_valvula_de_escape(governance_validator,
+                                                            complete_governance):
+    # `x_extensions` se retiró el 16 de septiembre de 2026: era el campo más inerte del archivo, nada
+    # lo validaba ni lo leía. Su uso previsto, declarar lo que no es portable, se deriva del artefacto.
+    # Desde entonces el esquema no admite NINGUNA clave desconocida, ni siquiera esa.
+    bad = {**complete_governance, "x_extensions": {"copilot": {"hooks": ["userPromptSubmitted"]}}}
+    assert any("x_extensions" in e for e in errors_of(governance_validator, bad))

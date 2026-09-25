@@ -38,12 +38,15 @@ def test_una_accion_sin_tope_de_tiempo_es_error():
     assert "hooks.timeout-missing" in _rules(snapshot(hooks=config))
 
 
-def test_el_campo_de_tope_inventado_por_la_demo_es_error_desde_el_primer_dia():
-    # `timeoutSec` no existe en el formato; la demo lo aceptaba «durante la migración».
+def test_el_tope_escrito_solo_con_el_nombre_de_copilot_es_error():
+    # `timeoutSec` es el nombre canónico del tope en Copilot, que admite `timeout` como alias y le da
+    # precedencia a `timeoutSec` (referencia de hooks de GitHub, consultada el 17 de septiembre de
+    # 2026). Claude Code sólo conoce `timeout`, así que una acción escrita sólo con el nombre de
+    # Copilot se queda SIN TOPE en Claude Code, que es justo lo que el campo pretendía evitar.
     config = hooks_config(timeoutSec=5)
     del config["hooks"]["PostToolUse"][0]["hooks"][0]["timeout"]
     rules = _rules(snapshot(hooks=config))
-    assert "hooks.invented-timeout-field" in rules
+    assert "hooks.non-portable-timeout-field" in rules
 
 
 def test_un_comando_que_apunta_fuera_de_la_unidad_es_error():

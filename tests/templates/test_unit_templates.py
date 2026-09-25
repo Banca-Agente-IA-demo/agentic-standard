@@ -13,6 +13,7 @@ import pytest
 
 from tests.support import errors_of
 from tests.templates.markers import MissingMarkerValue, STRUCTURED_TEMPLATES, instantiate, read_template
+from tests.validator.units import OBSERVED_TOOLS_CONTRACT
 
 UNIT_TEMPLATES = ("plugin-unit", "individual-unit")
 
@@ -50,8 +51,21 @@ def test_el_bloque_del_servidor_mcp_encaja_en_la_plantilla_de_unidad_agrupada(go
     governance = json.loads(instantiate(read_template("plugin-unit/GOVERNANCE.json")))
     block = json.loads(instantiate(read_template("artifacts/mcp/mcp-governance-block.json")))
     governance["permissions"] = {**governance["permissions"], "mcp_servers": ["jira"]}
-    governance["mcp"] = block["mcp"]
+    governance["mcp"] = {
+        server: {**entrada, "tools_contract": OBSERVED_TOOLS_CONTRACT} for server, entrada in block["mcp"].items()
+    }
     assert errors_of(governance_validator, governance) == []
+
+
+def test_la_plantilla_del_servidor_no_esta_completa_sin_lo_que_observa_el_asistente(governance_validator):
+    # La plantilla omite `tools_contract` A PROPÓSITO: es el bloque que escribe la máquina tras
+    # consultar al servidor. Antes emitía `write_operations: false` y ese valor por defecto llegaba a
+    # la solicitud sin que nadie hubiera mirado el servidor. Lo que nadie puso no puede colarse.
+    governance = json.loads(instantiate(read_template("plugin-unit/GOVERNANCE.json")))
+    block = json.loads(instantiate(read_template("artifacts/mcp/mcp-governance-block.json")))
+    governance["permissions"] = {**governance["permissions"], "mcp_servers": ["jira"]}
+    governance["mcp"] = block["mcp"]
+    assert errors_of(governance_validator, governance)
 
 
 @pytest.mark.parametrize("template", STRUCTURED_TEMPLATES)
@@ -99,10 +113,17 @@ def test_la_plantilla_de_servidor_declara_exactamente_uno_y_con_la_misma_clave_q
 def test_la_plantilla_de_servidor_referencia_la_credencial_por_nombre_y_no_por_valor():
     # C2: la unidad viaja sin el secreto; en la conexión sólo aparece el nombre de la variable.
     connection = json.loads(instantiate(read_template("artifacts/mcp/.mcp.json")))
-    block = json.loads(instantiate(read_template("artifacts/mcp/mcp-governance-block.json")))
-    declared = block["mcp"]["jira"]["credentials"]
     authorization = connection["mcpServers"]["jira"]["headers"]["Authorization"]
-    assert all(f"${{{name}}}" in authorization for name in declared), authorization
+    assert "${" in authorization and "}" in authorization, authorization
+
+
+def test_la_plantilla_de_servidor_declara_equipo_responsable_y_no_la_lista_de_credenciales():
+    # La lista `credentials` se retiró el 16 de septiembre de 2026: repetía los ${VAR} que ya están
+    # en el .mcp.json. Lo que la plantilla sí tiene que traer es a quién pedirle el acceso.
+    block = json.loads(instantiate(read_template("artifacts/mcp/mcp-governance-block.json")))
+    entrada = block["mcp"]["jira"]
+    assert "credentials" not in entrada
+    assert isinstance(entrada["accountable_team"], str) and entrada["accountable_team"]
 
 
 def test_una_plantilla_con_un_marcador_desconocido_falla_al_instanciarse():

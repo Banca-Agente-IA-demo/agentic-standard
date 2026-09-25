@@ -25,7 +25,6 @@ GOVERNANCE = {
     "risk_level": "low",
     "permissions": {"tools": [], "commands": [], "mcp_servers": []},
     "external_content": "no",
-    "x_extensions": {},
 }
 SCENARIOS = (
     "main_clean",

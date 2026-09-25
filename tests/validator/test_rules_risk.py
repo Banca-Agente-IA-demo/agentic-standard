@@ -19,17 +19,19 @@ def test_ejecutar_codigo_propio_sin_invocacion_eleva_el_minimo_a_medio():
 
 
 def test_un_servidor_solo_de_lectura_y_sin_credenciales_eleva_el_minimo_a_medio():
+    # Conectarse a un servidor externo ya eleva el mínimo, aunque sea de sólo lectura y sin
+    # autenticación: sin credenciales no hay menos riesgo, hay otro, porque lo que importa no es quién
+    # guarda la llave sino qué sale por ahí.
     snap = unit_with_mcp()
-    governance = copy.deepcopy(snap.governance)
-    governance["mcp"][SERVER]["credentials"] = []
-    del governance["mcp"][SERVER]["credentials_owner"]
-    assert minimum_risk(snapshot(governance=governance, mcp=snap.mcp)) is RiskLevel.MEDIUM
+    connection = copy.deepcopy(snap.mcp)
+    connection["mcpServers"][SERVER].pop("headers", None)
+    assert minimum_risk(snapshot(governance=snap.governance, mcp=connection)) is RiskLevel.MEDIUM
 
 
 def test_cada_hecho_de_riesgo_alto_lleva_el_minimo_al_nivel_mas_alto():
     snap = unit_with_mcp()
     escritura = copy.deepcopy(snap.governance)
-    escritura["mcp"][SERVER]["write_operations"] = True
+    escritura["mcp"][SERVER]["tools_contract"]["write_operations"] = True
     casos = {
         "el servidor escribe fuera del cliente": snapshot(governance=escritura, mcp=snap.mcp),
         "hay credenciales declaradas": snap,

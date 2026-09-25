@@ -4,8 +4,6 @@ description: "<<DESCRIPTION>>"
 tools:
   - Read
   - Grep
-metadata:
-  tags: <<TAGS>>
 ---
 
 # <<TITLE>>
@@ -14,15 +12,19 @@ metadata:
   DÓNDE VA: `agents/<<NAME>>.agent.md`. El nombre del archivo sin `.agent.md` tiene que coincidir con
   `name`. Una sola copia: los dos clientes leen `agents/` desde la raíz de la unidad (04 §2, medido).
 
-  EL FRONTMATTER SÓLO LLEVA LO QUE EL CLIENTE LEE más el mapa `metadata:` de catálogo (mismas claves
-  que en el skill; ver templates/artifacts/skill/SKILL.md). Nada de gobierno: el validador falla si
+  EL NOMBRE ADMITE PUNTOS, que separan los niveles de la convención `{app}.{dominio}.{rol}`:
+  `atla.cnf-migrator.analyst`. Medido el 24 de septiembre de 2026: el nombre con puntos carga y se
+  cualifica como `plugin:atla.cnf-migrator.analyst`. Los DOS PUNTOS siguen prohibidos, porque son ese
+  separador.
+
+  EL FRONTMATTER SÓLO LLEVA LOS CUATRO CAMPOS QUE 02 §5 DECLARA: `name`, `description`, `tools` y, si
+  delega, `handoffs`. NO lleva `metadata:`, que sólo existe en el formato del skill; las etiquetas de
+  catálogo viven en `keywords` del plugin.json de la unidad. Nada de gobierno: el validador falla si
   reaparece id, owner, version o status.
 
   `tools` ES LA SUPERFICIE DE LO QUE PUEDE HACER, y la pregunta de gobierno de este tipo. Declara sólo lo
   que necesita: cada herramienta de más es alcance que hay que justificar en la revisión. Un agente que
-  sólo lee no declara `Bash`. TODO lo que declares aquí tiene que estar en `permissions.tools` del
-  GOVERNANCE.json de la unidad; `rules` compara las dos listas y falla si el agente usa algo no declarado
-  (C1).
+  sólo lee no declara `Bash`. La lista es lo que se revisa y se aprueba en la solicitud de cambio.
 
   SI USA EL SERVIDOR MCP DE LA UNIDAD, restríngete a él en `tools` con LAS DOS GRAFÍAS a la vez, porque
   cada cliente sólo entiende la suya e ignora la otra en silencio (medido el 7 de septiembre de 2026):
@@ -35,7 +37,9 @@ metadata:
   Claude. Un agente sin `tools` hereda TODO lo instalado en la sesión del usuario, que es lo contrario de
   C1: el validador avisa. El servidor viaja en la misma unidad que el agente que lo usa (D7).
 
-  `model` es del cliente: si lo declaras, un solo valor, no una lista. Preferible no fijarlo.
+  `model` ESTÁ PROHIBIDO (02 §5). Existe en los dos clientes y los dos lo aplican, pero no hay un valor
+  que sirva a los dos: Claude Code entiende sus alias y sustituye el modelo Y SU VENTANA DE CONTEXTO;
+  Copilot entiende los suyos. Un agente que fija el modelo deja de ser portable.
 
   SI DELEGA EN OTRO AGENTE, añade `handoffs` con `label`, `agent`, `prompt` y `send` (no `auto_send`).
   Los agentes que se invocan entre sí VIAJAN EN LA MISMA UNIDAD: en Copilot el identificador cambia a

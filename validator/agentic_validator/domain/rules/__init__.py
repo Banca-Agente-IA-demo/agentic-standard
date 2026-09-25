@@ -36,7 +36,7 @@ ALL_RULES: tuple[Rule, ...] = (
     mcp.check_mcp_readable,
     mcp.check_single_server,
     mcp.check_governance_block_matches,
-    mcp.check_credentials_match,
+    mcp.check_every_server_has_an_accountable_team,
     mcp.check_no_literal_secrets,
     hooks.check_hooks_readable,
     hooks.check_hook_events_are_portable,

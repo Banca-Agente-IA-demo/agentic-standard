@@ -1,0 +1,18 @@
+{
+  "name": "<<NAME>>",
+  "version": "<<VERSION>>",
+  "description": "<<DESCRIPTION>>",
+  "author": {
+    "name": "<<TEAM>>",
+    "email": "<<TEAM_MAILBOX>>"
+  },
+  "repository": "https://github.com/<<ORG>>/<<REPO>>",
+  "license": "LicenseRef-BCP-Proprietary",
+  "keywords": [],
+  "metadata": {
+    "governance": {
+      "schema_version": "1.0",
+      "risk_level": "<<RISK_LEVEL>>"
+    }
+  }
+}

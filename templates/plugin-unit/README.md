@@ -1,50 +1,50 @@
 # Unidad agrupada (plugin)
 
-Dos archivos en la raíz de la unidad, dentro de `plugins/<<NAME>>/` del repositorio de dominio, y
-después los artefactos que agrupa, cada uno copiado desde `templates/artifacts/<tipo>/`.
+Un solo archivo de envoltorio en la raíz de la unidad, dentro de `plugins/<<NAME>>/` del repositorio de
+dominio, y después los artefactos que agrupa, cada uno copiado desde `templates/artifacts/<tipo>/`.
 
 ```
 plugins/<<NAME>>/
-├── .claude-plugin/plugin.json    identidad y versión DE LA UNIDAD; lo leen los dos clientes
-├── GOVERNANCE.json               decisiones humanas de gobierno; lo lee la automatización y Port
+├── .claude-plugin/plugin.json    identidad, versión y gobierno DE LA UNIDAD
 ├── skills/<nombre>/SKILL.md
 ├── agents/<nombre>.agent.md
 ├── commands/<nombre>.prompt.md
-├── .mcp.json                     como mucho UN servidor (D2)
+├── .mcp.json                     en la raíz de la unidad; una clave por servidor
 ├── hooks/hooks.json
 └── evals/<nombre>/promptfooconfig.yaml   una suite por skill, agente y prompt; obligatoria
 ```
 
-## Qué rellena cada campo
+**Un único manifiesto.** La identidad la lee el cliente para instalar; el gobierno vive dentro del
+mismo archivo, en `metadata.governance`, que es el objeto que el formato de plugin reserva para datos
+propios y que ningún cliente lee ni interpreta.
+
+## Qué rellena cada marcador
 
 | Marcador | Qué es | Ejemplo |
 |---|---|---|
-| `<<NAME>>` | Nombre corto de la unidad, minúsculas y guiones. Es el directorio, el `name` de `plugin.json`, la segunda mitad de `id` y lo que el usuario teclea al instalar | `cnf-migration-flow` |
+| `<<NAME>>` | Nombre de la unidad, minúsculas, números y guiones. Es el directorio, el `name` de `plugin.json` y lo que el consumidor teclea al instalar | `cnf-migration-flow` |
 | `<<REPO>>` | Repositorio de dominio que la aloja, sin organización | `agents-modernization` |
 | `<<ORG>>` | Organización de GitHub | `Banca-Agente-IA-demo` |
-| `<<VERSION>>` | SemVer estricto, entre comillas. Con sufijo `-beta.N` nace Experimental; sin sufijo, Producción (REGLAS-DE-VERSION.md) | `"0.1.0-beta.1"` |
-| `<<DESCRIPTION>>` | Qué hace la unidad, para la vitrina del marketplace y para Port | |
-| `<<TEAM>>` | Slug del equipo dueño, que debe existir en la organización | `squad-sdlc` |
-| `<<CONTACT>>` | Correo del equipo, no de una persona | `squad-sdlc@bcp.com.pe` |
-| `<<EXTERNAL_CONTENT>>` | Cómo trata la unidad el contenido que no controla (C3). Se borra la clave entera si el tipo no lo requiere | |
+| `<<VERSION>>` | SemVer, entre comillas. Toda versión nace con sufijo `-beta.N` | `"0.1.0-beta.1"` |
+| `<<DESCRIPTION>>` | Qué hace la unidad. Es lo que el consumidor lee en el catálogo antes de instalar | |
+| `<<TEAM>>` | Equipo dueño, nunca una persona. Es a quien responde por la unidad | `squad-cnf-migration` |
+| `<<TEAM_MAILBOX>>` | Buzón del equipo. Es adonde llega el aviso cuando la unidad se suspende | `squad-cnf-migration@bcp.com.pe` |
+| `<<RISK_LEVEL>>` | Impacto que el autor atribuye a la unidad: `low`, `medium` o `high`. Obligatorio: informa al catálogo y no deriva aprobadores ni plazos | `medium` |
 
-## Lo que NO va en `GOVERNANCE.json`, y dónde vive
+## Lo que no va en el manifiesto, y dónde vive
 
 | Dato | Dónde |
 |---|---|
-| Versión | `plugin.json` y la etiqueta |
-| Estado (`draft`, `experimental`, ...) | Lo deriva la automatización y lo escribe en Port |
+| Estado del ciclo de vida | Se deriva de las marcas del release; no se escribe en ningún archivo |
 | Inventario de artefactos | El árbol |
 | Quién aprobó y cuándo | La solicitud de cambio |
 | Veredicto de evals y atestación | El check run y la atestación del release |
 | Versión del estándar y fecha de revisión | Port, escritas por la automatización |
-| Metadata de catálogo (`tags`, plataforma) | El mapa `metadata:` del frontmatter de cada artefacto (D1) |
+| Etiquetas de catálogo | `keywords` de `plugin.json`, y `metadata.tags` del frontmatter de cada skill |
 
-## Campos opcionales que se añaden cuando aplican
+## Los dos bloques de gobierno que se añaden cuando aplican
 
-- `risk_level`: sólo para **elevar** el riesgo calculado. Si el cálculo ya da lo que quieres, no lo pongas.
-- `mcp`: **obligatorio** si la unidad lleva `.mcp.json`. Copia el bloque de `templates/artifacts/mcp/mcp-governance-block.json`.
-- `deprecation`: sólo en la solicitud de cambio que anuncia la obsolescencia. Los tres campos, en una versión de parche.
-
-`permissions` es obligatorio siempre, con las tres listas aunque estén vacías: una lista vacía afirma
-que no se usa nada de ese tipo, y `rules` lo comprueba contra los agentes, los hooks y `.mcp.json`.
+- **`mcp`**: obligatorio si la unidad lleva `.mcp.json`, con una entrada por servidor. Se copia de
+  `templates/artifacts/mcp/mcp-governance-block.json`.
+- **`deprecation`**: sólo en la solicitud de cambio que anuncia la obsolescencia, con sus dos campos y
+  en una versión de parche.

@@ -93,8 +93,8 @@ def test_el_formato_estructurado_lleva_el_veredicto_en_un_campo(tmp_path, capsys
 def test_una_credencial_en_claro_en_una_unidad_real_se_detecta(tmp_path):
     """C2: la unidad viaja sin el secreto.
 
-    Sustituir la variable por un literal produce dos hallazgos y los dos son correctos: el valor en
-    claro, y la credencial que el gobierno declara y la conexión ya no usa.
+    Sustituir la variable por un literal lo detectan dos reglas, la del bloque MCP y la de higiene
+    sobre el contenido versionado, y las dos son correctas.
     """
     root = build_unit(tmp_path, with_mcp=True)
     connection = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))
@@ -103,8 +103,7 @@ def test_una_credencial_en_claro_en_una_unidad_real_se_detecta(tmp_path):
     findings = review_unit(root).findings
     rules = [f.rule for f in findings]
     assert "mcp.literal-secret" in rules
-    assert "mcp.credential-unused" in rules
-    assert CREDENTIAL in str(findings)
+    assert "hygiene.literal-secret" in rules
 
 
 def test_lo_que_la_unidad_no_versiona_no_se_juzga(tmp_path):

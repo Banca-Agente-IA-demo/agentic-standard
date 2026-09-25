@@ -14,7 +14,7 @@ def _rules(snap) -> list[str]:
         mcp.check_mcp_readable(snap)
         + mcp.check_single_server(snap)
         + mcp.check_governance_block_matches(snap)
-        + mcp.check_credentials_match(snap)
+        + mcp.check_every_server_has_an_accountable_team(snap)
         + mcp.check_no_literal_secrets(snap)
     )
     return [f.rule for f in findings]
@@ -59,19 +59,26 @@ def test_un_servidor_que_no_esta_en_los_permisos_es_error():
     assert "mcp.server-not-in-permissions" in _rules(snapshot(governance=governance, mcp=snap.mcp))
 
 
-def test_una_credencial_usada_y_no_declarada_es_error():
+def test_un_servidor_con_credenciales_sin_equipo_responsable_es_error():
+    # Con credenciales, el dueño es a quien se le pide el acceso: sin él, quien instale la unidad se
+    # queda con un token que no sabe pedir.
     snap = unit_with_mcp()
     governance = copy.deepcopy(snap.governance)
-    governance["mcp"][SERVER]["credentials"] = []
-    assert "mcp.credential-undeclared" in _rules(snapshot(governance=governance, mcp=snap.mcp))
+    del governance["mcp"][SERVER]["accountable_team"]
+    assert "mcp.server-without-accountable-team" in _rules(snapshot(governance=governance, mcp=snap.mcp))
 
 
-def test_una_credencial_declarada_y_no_usada_es_error():
-    # El cotejo va en los dos sentidos: declarar de más también miente sobre lo que la unidad necesita.
+def test_un_servidor_sin_credenciales_tambien_necesita_equipo_responsable():
+    # Decidido el 17 de septiembre de 2026. Antes se eximía a los servidores sin autenticación, y eso
+    # dejaba entrar endpoints externos sin que nadie los avalara: pedir una credencial era la única
+    # conversación que obligaba a mirar el servidor. Sin autenticación no hay menos riesgo, hay otro.
     snap = unit_with_mcp()
     governance = copy.deepcopy(snap.governance)
-    governance["mcp"][SERVER]["credentials"] = [CREDENTIAL, "OTRO_TOKEN"]
-    assert "mcp.credential-unused" in _rules(snapshot(governance=governance, mcp=snap.mcp))
+    del governance["mcp"][SERVER]["accountable_team"]
+    connection = copy.deepcopy(snap.mcp)
+    connection["mcpServers"][SERVER].pop("headers", None)
+    connection["mcpServers"][SERVER].pop("env", None)
+    assert "mcp.server-without-accountable-team" in _rules(snapshot(governance=governance, mcp=connection))
 
 
 def test_las_variables_del_cliente_no_cuentan_como_credenciales():

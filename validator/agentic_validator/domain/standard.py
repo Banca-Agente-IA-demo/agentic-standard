@@ -16,6 +16,13 @@ MCP_FILE = ".mcp.json"
 HOOKS_FILE = "hooks/hooks.json"
 EVALS_DIR = "evals"
 
+# Declarar el `$schema` de Agent Plugins NO es documentación: Copilot lo toma como declaración de
+# layout y pasa a buscar los agentes en `com.github.copilot/agents` en vez de en `agents/`. Medido el
+# 18 de septiembre de 2026 con causalidad, cambiando sólo el manifiesto de la misma unidad: con el
+# campo, `No such agent` y respuesta vacía; sin él, el agente responde. Se compara por HOST y no por
+# la URL entera, porque el efecto es del estándar y no de una versión suya.
+AGENT_PLUGINS_SCHEMA_HOST = "agent-plugins.org"
+
 # El formato de plugin permite estos campos de primer nivel. El estándar no publica un esquema suyo:
 # es formato ajeno y una copia derivaría (revisión del hito 1 §3).
 ALLOWED_MANIFEST_FIELDS = frozenset(

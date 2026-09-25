@@ -10,7 +10,7 @@ import re
 
 from agentic_validator.domain.findings import Finding, error
 from agentic_validator.domain.snapshot import UnitSnapshot
-from agentic_validator.domain.standard import ALLOWED_MANIFEST_FIELDS, GOVERNANCE_FILE, MANIFEST_FILE
+from agentic_validator.domain.standard import AGENT_PLUGINS_SCHEMA_HOST, ALLOWED_MANIFEST_FIELDS, GOVERNANCE_FILE, MANIFEST_FILE
 
 # SemVer 2.0.0 con sufijo de prelanzamiento opcional y sin metadatos de compilación. La etiqueta debe
 # coincidir con esta versión y el índice la copia (02 §7.1).
@@ -112,9 +112,15 @@ def check_manifest_fields(snapshot: UnitSnapshot) -> tuple[Finding, ...]:
     findings: list[Finding] = []
     if not manifest.get("name"):
         findings.append(error("identity.manifest-name-missing", MANIFEST_FILE, "la identidad no declara nombre"))
-    if not manifest.get("$schema"):
-        # Es público y sí resuelve desde el editor, al contrario que el del gobierno (D5).
+    declared_schema = str(manifest.get("$schema") or "")
+    if AGENT_PLUGINS_SCHEMA_HOST in declared_schema:
         findings.append(
-            error("identity.manifest-schema-missing", MANIFEST_FILE, "la identidad no declara $schema")
+            error(
+                "identity.manifest-schema-hides-agents",
+                MANIFEST_FILE,
+                "declarar el $schema de Agent Plugins hace que Copilot busque los agentes en "
+                "'com.github.copilot/agents' y no en 'agents/': la unidad instala y sus agentes "
+                "desaparecen sin error",
+            )
         )
     return tuple(findings)

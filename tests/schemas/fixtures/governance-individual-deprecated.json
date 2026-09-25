@@ -5,6 +5,7 @@
     "team": "squad-sdlc",
     "contact": "squad-sdlc@bcp.com.pe"
   },
+  "risk_level": "low",
   "data_classification": "internal",
   "permissions": {
     "tools": [],
@@ -13,7 +14,6 @@
   },
   "deprecation": {
     "superseded_by": "none",
-    "sunset_date": "2027-03-31",
-    "decided_by": "@bcp/lt-quality"
+    "sunset_date": "2027-03-31"
   }
 }
