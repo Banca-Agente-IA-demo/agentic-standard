@@ -27,7 +27,13 @@ INITIAL_VERSION = "0.1.0-beta.1"
 # El texto que hace visible que algo está sin terminar. Tiene que ser reconocible: una descripción
 # plausible convierte «sin completar» en indetectable, y el esqueleto debe fallar el gate de forma
 # evidente, no parecer una unidad terminada.
-UNFINISHED_MARK = "PENDIENTE: describir qué hace y cuándo debe activarse"
+#
+# NO LLEVA DOS PUNTOS, y no es estilo. Este texto se inyecta en el frontmatter YAML de cada
+# artefacto, y un valor sin comillas que contenga `:` rompe el documento. Medido el 25 de septiembre
+# de 2026 sobre la primera unidad sembrada de verdad: GitHub rechazaba el `SKILL.md` con «mapping
+# values are not allowed in this context at line 2 column 23», que es exactamente la posición del
+# segundo dos puntos.
+UNFINISHED_MARK = "PENDIENTE describir que hace y cuando debe activarse"
 
 
 def build_manifest(request: UnitRequest, template: dict) -> dict:

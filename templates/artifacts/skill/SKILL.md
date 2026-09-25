@@ -1,6 +1,6 @@
 ---
 name: <<NAME>>
-description: <<DESCRIPTION>>
+description: "<<DESCRIPTION>>"
 metadata:
   tags: <<TAGS>>
 ---
@@ -33,6 +33,12 @@ metadata:
         technologies: Quarkus 3.x, Maven
 
   Si no hay nada que declarar, borra el bloque `metadata:` entero en vez de dejarlo vacío.
+
+  LA DESCRIPCIÓN VA ENTRE COMILLAS, y no es estilo: una descripción sin comillas que contenga DOS
+  PUNTOS rompe el frontmatter entero. Medido el 25 de septiembre de 2026 sobre la primera unidad
+  sembrada: «mapping values are not allowed in this context at line 2 column 23», que es la posición
+  exacta del segundo dos puntos. Y los dos puntos son frecuentes en una buena descripción: «Traduce
+  patrones Spring a Quarkus: REST y persistencia». Si el texto lleva comillas dobles, escápalas.
 
   LA `description` ES EL CAMPO MÁS IMPORTANTE del archivo y el que más se descuida. Es lo que el modelo
   lee para decidir si usa este skill, y lo único que se carga en CADA petición. Tiene que decir DOS cosas:

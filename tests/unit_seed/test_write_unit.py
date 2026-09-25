@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from unit_seed.errors import TemplateNotFoundError
 from unit_seed.unit_request import UnitRequest
@@ -74,6 +75,27 @@ def test_el_manifiesto_sembrado_es_json_valido_y_trae_el_gobierno(tmp_path: Path
         .read_text(encoding="utf-8"))
     assert manifest["metadata"]["governance"]["risk_level"] == "medium"
     assert manifest["author"]["email"] == "squad-cnf-migration@bcp.com.pe"
+
+
+def test_el_frontmatter_de_cada_artefacto_sembrado_es_yaml_valido(tmp_path: Path) -> None:
+    # Medido el 25 de septiembre de 2026 sobre la primera unidad sembrada de verdad: GitHub rechazaba
+    # el SKILL.md con «mapping values are not allowed in this context at line 2 column 23». El
+    # marcador de pendiente llevaba dos puntos y la plantilla del skill no entrecomillaba la
+    # descripción, así que el frontmatter dejaba de ser YAML. El agente y el prompt se salvaron solo
+    # porque sus plantillas sí la entrecomillan.
+    #
+    # La prueba mira el RESULTADO y no la causa: cualquier otro carácter que rompa el documento cae
+    # aquí igual.
+    _seed(tmp_path)
+    unit = tmp_path / "plugins" / "cnf-migration-flow"
+    documentos = sorted(unit.rglob("*.md"))
+    assert len(documentos) == 6, [p.name for p in documentos]
+    for documento in documentos:
+        texto = documento.read_text(encoding="utf-8")
+        assert texto.startswith("---\n"), documento.name
+        frontmatter = texto.split("---", 2)[1]
+        cargado = yaml.safe_load(frontmatter)
+        assert isinstance(cargado, dict) and cargado.get("name"), documento.name
 
 
 def test_el_esqueleto_no_puede_parecer_terminado(tmp_path: Path) -> None:
