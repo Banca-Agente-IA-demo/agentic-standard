@@ -1,0 +1,82 @@
+# Valida el formulario de Port y compone el esqueleto de la unidad, en un solo paso.
+#
+# REEMPLAZA A `validate-payload` Y A `seed-unit`, que hacían esto en dos. El diagrama de autoría
+# quiere un step de Python y no cuatro actions, y la lógica que estaba repartida entre las dos vive
+# ahora en `tools/create_unit/`, con las cuatro bandas del estándar por dentro.
+#
+# ES UNA COMPOSITE ACTION Y NO UN PASO DEL REUTILIZABLE, por el motivo medido en la ronda 29 de
+# `experimentos`: un reutilizable NO puede leer archivos de su propio repositorio, y el
+# `GITHUB_TOKEN` por defecto falla con `Repository not found` al clonar el estándar cuando es
+# privado, que es el caso de BCP. Una composite action se resuelve por la política de acceso de la
+# organización y llega con el árbol dentro, así que el código Y LAS PLANTILLAS salen de ese mismo
+# árbol. Por lo mismo, la versión de Python sale de `.python-version` del estándar y no de un valor
+# escrito aquí: un solo sitio donde cambiar el número.
+#
+# NO ESCRIBE EN EL REPOSITORIO DE DOMINIO. Compone el esqueleto bajo `root`, que es un directorio de
+# trabajo del runner. Empujarlo es del job que tiene `contents: write`, y esta action está pensada
+# para correr en un job con los permisos vacíos.
+#
+# NO FALLA CUANDO EL FORMULARIO VIENE MAL: devuelve `validation-status` con el motivo. Falla solo
+# cuando NO PUDO comprobar, que no es lo mismo y no se le puede reprochar a quien rellenó el
+# formulario.
+name: create-unit
+description: Valida el formulario de Port, comprueba el nombre en el catálogo y compone el esqueleto.
+
+inputs:
+  payload-file:
+    description: Archivo JSON con el formulario que envió Port.
+    required: true
+  root:
+    description: Directorio de trabajo donde se compone el esqueleto.
+    required: true
+  run-id:
+    description: Ejecución de Port a la que devolver el motivo si el formulario no vale.
+    required: false
+    default: ""
+
+outputs:
+  validation-status:
+    description: "Uno de: valid, malformed_payload, name_taken."
+    value: ${{ steps.create.outputs.validation_status }}
+  reason:
+    description: El motivo legible cuando el estado no es valid. Vacío cuando lo es.
+    value: ${{ steps.create.outputs.reason }}
+  unit-name:
+    description: El nombre de la unidad, ya validado.
+    value: ${{ steps.create.outputs.unit_name }}
+  normalized-payload:
+    description: El formulario con los campos numerados colapsados y el equipo resuelto.
+    value: ${{ steps.create.outputs.normalized_payload }}
+
+runs:
+  using: composite
+  steps:
+    - name: Instalar la versión de Python que el estándar declara
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version-file: ${{ github.action_path }}/../../../.python-version
+
+    - name: Instalar las herramientas desde el árbol del estándar que trae esta action
+      shell: bash
+      run: |
+        set -euo pipefail
+        python -m pip install --quiet "${{ github.action_path }}/../../.."
+
+    - name: Validar el formulario y componer el esqueleto de la unidad
+      id: create
+      shell: bash
+      env:
+        PAYLOAD_FILE: ${{ inputs.payload-file }}
+        ROOT: ${{ inputs.root }}
+        RUN_ID: ${{ inputs.run-id }}
+        STANDARD_TREE: ${{ github.action_path }}/../../..
+      # UNA SOLA ORDEN, y ningún Python incrustado. Los outputs del step y el resumen del job los
+      # escribe el propio adaptador, leyendo `GITHUB_OUTPUT` y `GITHUB_STEP_SUMMARY` del entorno:
+      # un heredoc de Python dentro del YAML es código sin archivo, sin pruebas y sin revisión.
+      run: |
+        set -euo pipefail
+        mkdir -p "$ROOT"
+        python "$STANDARD_TREE/tools/create_unit_cli.py" \
+          --payload "$PAYLOAD_FILE" \
+          --root "$ROOT" \
+          --run-id "$RUN_ID" > /dev/null

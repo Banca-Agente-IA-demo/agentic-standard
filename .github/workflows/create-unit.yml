@@ -6,28 +6,35 @@
 #
 # FIRMA PARA QUIEN LO INVOCA:
 #
-#   permiso            job           por qué
-#   contents: write    create-unit   crear la rama feat/<unidad> y empujar el esqueleto
+#   permiso            por qué
+#   contents: write    crear la rama feat/<unidad> y empujar el esqueleto
 #
-#   secreto                job                          por qué
-#   PORT_CLIENT_ID         validate-payload, los tres   consultar el catálogo e informar
-#   PORT_CLIENT_SECRET     validate-payload, los tres   idem
+#   secreto                por qué
+#   PORT_CLIENT_ID         consultar el catálogo, devolver el motivo y registrar la ficha
+#   PORT_CLIENT_SECRET     idem
 #
 # El llamador debe conceder exactamente eso. Los permisos del llamado solo se pueden mantener o
 # reducir, nunca elevar: si concede menos, la ejecución muere en el arranque sin mensaje útil.
 #
-# POR QUÉ TRES JOBS Y NO UNO. Validar y crear son responsabilidades distintas, y separarlas permite
-# que el job de error arranque sobre un job que terminó EN VERDE con el veredicto en false. Un
-# payload inválido no es un fallo del workflow: es una respuesta.
+# UN SOLO JOB, como el diagrama de autoría. La consecuencia hay que conocerla: en Actions el token se
+# concede POR JOB y todos los steps lo comparten, así que el step que procesa el formulario corre con
+# el mismo `contents: write` que necesita el push. No aumenta el permiso máximo; aumenta cuánto
+# código queda expuesto a él. Lo mitiga que el step de Python no toca el repositorio: quien hace
+# `git` son los dos steps de shell.
 #
-# LAS PLANTILLAS Y EL CÓDIGO NO SE CLONAN: llegan dentro de las composite actions, porque un
-# reutilizable no puede leer archivos de su propio repositorio.
+# TODO LO QUE DECIDE ESTÁ EN UN SOLO STEP DE PYTHON. Las cajas del recuadro `create unit step` del
+# diagrama (validar el formulario, pedir el catálogo en todos los estados, comprobar que el nombre
+# esté libre, sembrar el esqueleto y devolver el motivo cuando no procede) son las cuatro bandas de
+# `tools/create_unit/`. Este archivo solo dice EN QUÉ ORDEN ocurren las cosas (E3).
 #
-# POR QUÉ SUPERA LAS 150 LÍNEAS. El archivo describe tres jobs y la mitad de su extensión son los
-# comentarios que explican las decisiones medidas. Partirlo en tres archivos escondería en qué orden
-# ocurren las cosas, que es lo único que este workflow aporta: la lógica ya está fuera, en las
-# actions y en el código que instalan. Quien busque qué se comprueba o cómo se siembra no lo
-# encuentra aquí ni debe.
+# EL CÓDIGO Y LAS PLANTILLAS NO SE CLONAN: llegan dentro de la composite action. Medido en la ronda
+# 29 de `experimentos`: un reutilizable no puede leer archivos de su propio repositorio, y
+# `checkout` del estándar privado falla con `Repository not found`, mientras que una composite action
+# llega con su árbol.
+#
+# LA RAMA SE CREA ANTES DE VALIDAR, como en el diagrama, y no es un descuido: es una rama LOCAL del
+# runner. Solo se empuja cuando el veredicto es `valid`, así que un formulario inválido no deja nada
+# en el remoto.
 name: create-unit
 
 on:
@@ -51,96 +58,40 @@ on:
       unit-name:
         description: El nombre de la unidad sembrada.
         value: ${{ jobs.create-unit.outputs.unit-name }}
+      validation-status:
+        description: "Uno de: valid, malformed_payload, name_taken."
+        value: ${{ jobs.create-unit.outputs.validation-status }}
       branch:
         description: La rama donde quedó el esqueleto.
         value: ${{ jobs.create-unit.outputs.branch }}
 permissions: {}
 
 jobs:
-  validate-payload:
-    name: validate-payload
+  create-unit:
+    name: create-unit
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions: {}
+    timeout-minutes: 15
+    permissions:
+      contents: write
     # Las credenciales van al nivel del JOB y no al del step. Un `env:` sobre un step que invoca una
     # composite action no está garantizado que llegue a los pasos de dentro; el del job sí, y es
     # donde de verdad hacen falta.
     env:
       PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
       PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}
+      # El nombre de la unidad se resuelve UNA vez, del formulario, y viaja como variable del job.
+      # La misma expresión repetida en cuatro steps son cuatro sitios donde puede divergir (Y3).
+      UNIT_NAME: ${{ fromJSON(inputs.payload).name }}
     outputs:
-      status: ${{ steps.check.outputs.status }}
-      reason: ${{ steps.check.outputs.reason }}
-      unit-name: ${{ steps.check.outputs.unit-name }}
-      normalized-payload: ${{ steps.check.outputs.normalized-payload }}
-    steps:
-      - name: Guardar el formulario en un archivo
-        # El payload va a un archivo y no a la línea de órdenes: un JSON con comillas y saltos de
-        # línea no se escapa igual en cada shell, y un escapado que falla no da error, da OTRO JSON.
-        env:
-          PAYLOAD: ${{ inputs.payload }}
-        run: printf '%s' "$PAYLOAD" > "$RUNNER_TEMP/payload.json"
-
-      - name: Comprobar la forma del payload y que el nombre esté libre
-        id: check
-        # Las tres actions de este repositorio apuntan a la RAMA mientras se prueba, porque la
-        # etiqueta `v1` existe desde antes y no las contiene. Vuelven a `@v1` al fusionar.
-        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/validate-payload@feat/create-unit-self-service
-        with:
-          payload-file: ${{ runner.temp }}/payload.json
-
-  report-error:
-    name: report-error
-    needs: validate-payload
-    if: needs.validate-payload.outputs.status != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions: {}
-    env:
-      PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
-      PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}
-    steps:
-      - name: Devolver el motivo a quien rellenó el formulario
-        if: inputs.port_run_id != ''
-        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@feat/create-unit-self-service
-        with:
-          run-id: ${{ inputs.port_run_id }}
-          status: FAILURE
-          summary: ${{ needs.validate-payload.outputs.reason }}
-
-      - name: Dejar el motivo también en el resumen de la ejecución
-        run: |
-          set -euo pipefail
-          {
-            echo "### La unidad no se creó"
-            echo ''
-            echo "${{ needs.validate-payload.outputs.reason }}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  create-unit:
-    name: create-unit
-    needs: validate-payload
-    if: needs.validate-payload.outputs.status == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    env:
-      PORT_CLIENT_ID: ${{ secrets.PORT_CLIENT_ID }}
-      PORT_CLIENT_SECRET: ${{ secrets.PORT_CLIENT_SECRET }}
-    outputs:
-      unit-name: ${{ needs.validate-payload.outputs.unit-name }}
+      validation-status: ${{ steps.create.outputs.validation-status }}
+      unit-name: ${{ steps.create.outputs.unit-name }}
       branch: ${{ steps.branch.outputs.name }}
     steps:
       - name: Checkout del repositorio de dominio, donde vivirá la unidad
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Resolver el nombre de la rama
-        # Se resuelve una sola vez y viaja como output: la misma expresión repetida en tres steps son
-        # tres sitios donde puede divergir.
+      - name: Resolver el nombre de la rama de trabajo
         id: branch
-        env:
-          UNIT_NAME: ${{ needs.validate-payload.outputs.unit-name }}
         run: echo "name=feat/$UNIT_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Crear la rama de trabajo de la unidad
@@ -148,21 +99,26 @@ jobs:
         # misma unidad debe fallar en voz alta y nunca sobrescribir.
         run: git switch -c "${{ steps.branch.outputs.name }}"
 
-      - name: Guardar el payload normalizado en un archivo
+      - name: Guardar el formulario de Port en un archivo
+        # El payload va a un archivo y no a la línea de órdenes: un JSON con comillas y saltos de
+        # línea no se escapa igual en cada shell, y un escapado que falla no da error, da OTRO JSON.
         env:
-          NORMALIZED: ${{ needs.validate-payload.outputs.normalized-payload }}
-        run: printf '%s' "$NORMALIZED" > "$RUNNER_TEMP/payload.json"
+          PAYLOAD: ${{ inputs.payload }}
+        run: printf '%s' "$PAYLOAD" > "$RUNNER_TEMP/payload.json"
 
-      - name: Sembrar el esqueleto desde las plantillas del estándar
-        id: seed
-        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/seed-unit@feat/create-unit-self-service
+      - name: Validar el formulario, comprobar el nombre y sembrar el esqueleto
+        id: create
+        # Las actions de este repositorio apuntan a la RAMA mientras se prueba, porque la etiqueta
+        # `v1` existe desde antes y no las contiene. Vuelven a `@v1` al fusionar.
+        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/create-unit@feat/create-unit-self-service
         with:
           payload-file: ${{ runner.temp }}/payload.json
-          root: .
+          root: ${{ github.workspace }}
+          run-id: ${{ inputs.port_run_id }}
 
       - name: Publicar la rama con el esqueleto
+        if: steps.create.outputs.validation-status == 'valid'
         env:
-          UNIT_NAME: ${{ needs.validate-payload.outputs.unit-name }}
           BRANCH: ${{ steps.branch.outputs.name }}
         run: |
           set -euo pipefail
@@ -176,44 +132,26 @@ jobs:
         # Es la clave de cruce entre el catálogo y el repositorio, y se resuelve DESPUÉS del push,
         # que es cuando ese commit existe en el remoto.
         id: commit
+        if: steps.create.outputs.validation-status == 'valid'
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      - name: Guardar el formulario normalizado en un archivo
+        if: steps.create.outputs.validation-status == 'valid'
+        env:
+          NORMALIZED: ${{ steps.create.outputs.normalized-payload }}
+        run: printf '%s' "$NORMALIZED" > "$RUNNER_TEMP/normalized.json"
+
       - name: Registrar la unidad en el catálogo, en estado Desarrollo
-        id: register
+        if: steps.create.outputs.validation-status == 'valid'
         uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/register-unit@feat/create-unit-self-service
         with:
-          payload-file: ${{ runner.temp }}/payload.json
+          payload-file: ${{ runner.temp }}/normalized.json
           sha: ${{ steps.commit.outputs.sha }}
-
-      - name: Retirar la rama si el nombre ya tenía ficha
-        # Es el único caso en que la rama sobra y el fallo no es nuestro: dos autores fueron con el
-        # mismo nombre y el segundo llegó tarde. La comprobación previa reduce esa ventana, no la
-        # elimina, porque la ficha nace al final.
-        if: steps.register.outputs.name-taken == 'true'
-        env:
-          BRANCH: ${{ steps.branch.outputs.name }}
-        run: git push origin --delete "$BRANCH"
-
-      - name: Devolver el motivo cuando el nombre ya estaba tomado
-        if: steps.register.outputs.name-taken == 'true' && inputs.port_run_id != ''
-        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@feat/create-unit-self-service
-        with:
-          run-id: ${{ inputs.port_run_id }}
-          status: FAILURE
-          summary: ${{ steps.register.outputs.reason }}
-
-      - name: Devolver el resultado a quien rellenó el formulario
-        if: steps.register.outputs.name-taken != 'true' && inputs.port_run_id != ''
-        uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/report-run@feat/create-unit-self-service
-        with:
-          run-id: ${{ inputs.port_run_id }}
-          status: SUCCESS
-          summary: "La unidad ${{ needs.validate-payload.outputs.unit-name }} se sembro en la rama ${{ steps.branch.outputs.name }} y quedo registrada en estado Desarrollo."
 
       - name: Retirar la rama si algo falló después de publicarla
         # O existen la rama y la ficha, o no existe ninguna de las dos. Una rama sin ficha es
         # indistinguible de una unidad abandonada, y una ficha sin rama promete un código que no
-        # está.
+        # está. El `|| true` cubre el caso de que la rama nunca llegara a empujarse.
         if: failure()
         env:
           BRANCH: ${{ steps.branch.outputs.name }}

@@ -166,6 +166,51 @@ Cuando la banda de salida encuentra un incumplimiento, no lo corrige: lo nombra 
 verificador que repara enmascara el defecto del productor y deja de ser comparable consigo mismo
 entre ejecuciones. Si sobra un temporal en la salida, la corrección va en la capacidad que lo creó.
 
+### C8 · Todo dato estructurado tiene tipo propio
+
+Ninguna firma declara `dict`, `Mapping`, `object`, `Any` ni sus combinaciones (`dict[str, Any]`,
+`list[dict]`) para datos del dominio. Si el dato tiene campos, tiene un tipo, y ese tipo vive en
+`commons/models/` del nivel que le toca (E5). Lo mismo para los valores: un conjunto cerrado es un
+enumerado (T1) y un número que gobierna comportamiento es una constante nombrada (T6). **Un dato sin
+tipo propio es un dato que nadie declara.**
+
+**La única ventana**, y es de una línea: el valor que devuelve `json.loads` antes de pasarlo a
+`model_validate()`. Ese instante es la frontera, y C2 dice qué hay a cada lado. A partir de ahí
+viaja el modelo, que es C3.
+
+**El defecto que previene.** Un `dict` no falla cuando falta una clave ni cuando el nombre llega con
+una errata: devuelve `None`, o revienta tres funciones más tarde y en otro archivo, con un
+`KeyError` que no dice quién tenía que haberla puesto. Es el mismo argumento que `slots=True` en C2,
+aplicado a la estructura entera en vez de a un campo.
+
+Y hay una razón de contrato, no solo de comodidad: **`check_contracts` cruza lo declarado con lo
+implementado sin ejecutar nada** (C5). Un `dict[str, Any]` no declara nada, así que un nodo que lo
+use queda fuera de esa comprobación sin que el comprobador pueda avisar.
+
+```python
+# MAL · la forma del dato solo existe en la cabeza de quien lo escribio
+def compose_finding(data: dict) -> dict:
+    return {"owner": data["owner"], "detail": data.get("detail", "")}
+
+# BIEN · la forma esta declarada, y `check_contracts` la puede leer
+@dataclass(frozen=True, slots=True)
+class Finding:
+    owner: Owner            # enumerado, no cadena (T1)
+    detail: str
+
+def compose_finding(request: FindingRequest) -> Finding: ...
+```
+
+**Qué hacer cuando el dato de fuera no tiene forma fija**, como el payload de un proceso ajeno cuyas
+claves cambian según quién lo emita: se declaran las variantes que se leen, una por emisor, y se
+elige con un enumerado. La regla no admite `Mapping[str, object]` como atajo, y el motivo es que ese
+atajo **esconde precisamente la diferencia que hay que declarar**: si tres emisores mandan tres
+formas, el código que las trata por igual funciona hasta que una cambia.
+
+**Es verificable, y debe verificarse** con una prueba estructural (PR2): recorrer las anotaciones de
+las funciones públicas, comprobar que ninguna nombra los tipos prohibidos, y contar cuántas firmas
+se revisaron (PR3).
+
 ---
 
 ## 3. Cómo se escribe un paso
@@ -905,6 +950,8 @@ autoexplicativo en la UI sin abrir el log: `Install dependencias del proveedor (
 - [ ] Hay una comprobación que cruza lo declarado con lo implementado sin ejecutar. (C5)
 - [ ] Cada clave del contrato declara quién la lee. (C6)
 - [ ] El verificador nombra y enruta; no repara. (C7)
+- [ ] Ninguna firma declara `dict`, `Mapping`, `object` ni `Any` para datos del dominio. (C8)
+- [ ] Los tipos viven en el `commons/models/` que les toca, y los conjuntos cerrados son enumerados. (C8, T1, E5)
 
 **Pasos y funciones**
 - [ ] El docstring abre con número, determinismo y capacidad. (S1)
