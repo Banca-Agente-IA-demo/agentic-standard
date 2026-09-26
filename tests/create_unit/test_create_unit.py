@@ -10,6 +10,7 @@ import dataclasses
 import json
 from pathlib import Path
 
+import register_unit as register_unit_cli
 from create_unit.commons.enums.validation_status import ValidationStatus
 from create_unit.create_unit import create_unit
 
@@ -133,3 +134,43 @@ def test_el_veredicto_tiene_las_mismas_claves_valga_lo_que_valga_el_estado(tmp_p
     assert set(dataclasses.asdict(valido)) == {"status", "reason", "unit_name",
                                                "normalized_payload", "files"}, (
         "cambiaron las claves del veredicto sin tocar la action, que las emite una a una")
+
+
+def test_el_motivo_es_una_sola_frase_bien_puntuada(tmp_path) -> None:
+    """Medido el 26 de septiembre de 2026 contra Port: el prefijo acababa en punto y el detalle
+    empieza en minuscula, asi que el panel mostraba dos frases con la segunda mal escrita."""
+    outcome = create_unit(_write_form(tmp_path, {"name": "probe-unidad", "unit_form": "individual"}),
+                          TEMPLATES, tmp_path / "root", FakeCatalog(()), "")
+
+    assert ". " not in outcome.reason, (
+        "el motivo %r sigue partido en dos frases. El detalle que se inserta empieza en minuscula, "
+        "asi que el separador es dos puntos" % outcome.reason)
+
+
+def test_el_nombre_ocupado_al_registrar_devuelve_el_motivo_a_port() -> None:
+    """La carrera que la comprobacion previa no cierra: dos autores con el mismo nombre y la ficha
+    nace al final. No se puede forzar desde fuera, asi que se mide aqui."""
+    avisos: list[tuple[str, str]] = []
+
+    class CatalogoQueAvisa:
+        def patch(self, path: str, body: dict) -> dict:
+            avisos.append((body.get("status", ""), body.get("summary", "")))
+            return {}
+
+    register_unit_cli._write_run_failure(CatalogoQueAvisa(), "r_prueba",
+                                         "El nombre probe ya tiene ficha.")
+
+    assert avisos == [("FAILURE", "El nombre probe ya tiene ficha.")], (
+        "el nombre ocupado al registrar no devolvio el motivo a Port. Sin el, el autor ve una "
+        "ejecucion cerrada sin texto y una rama que no llego a ninguna parte: %s" % avisos)
+
+
+def test_sin_ejecucion_de_port_no_se_avisa_a_nadie() -> None:
+    """Una invocacion fuera del autoservicio no tiene ejecucion a la que responder, y eso no es un
+    error: intentarlo gastaria una llamada y fallaria con un identificador vacio."""
+    class CatalogoQueNoDeberiaRecibirNada:
+        def patch(self, path: str, body: dict) -> dict:
+            raise AssertionError("se aviso a Port sin ejecucion que responder")
+
+    register_unit_cli._write_run_failure(CatalogoQueNoDeberiaRecibirNada(), "", "cualquier motivo")
+    register_unit_cli._write_run_success(CatalogoQueNoDeberiaRecibirNada(), "", "u", "feat/u")

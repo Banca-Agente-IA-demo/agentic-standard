@@ -35,7 +35,9 @@ log = logging.getLogger(__name__)
 # El motivo de cada estado que para el flujo. `VALID` no aparece porque no tiene motivo que dar, y
 # escribirle uno vacío invitaría a mostrarlo. Lleva un hueco para el nombre donde el nombre importa.
 _REASON = {
-    ValidationStatus.MALFORMED_PAYLOAD: "El formulario no describe una unidad que se pueda sembrar. %s",
+    # Dos puntos y no punto: el detalle que se inserta empieza en minuscula, y con punto se leia
+    # como dos frases con la segunda mal escrita. Medido en las pruebas negativas del 26/09/2026.
+    ValidationStatus.MALFORMED_PAYLOAD: "El formulario no describe una unidad que se pueda sembrar: %s",
     ValidationStatus.NAME_TAKEN: ("El nombre %s ya esta ocupado por otra unidad del catalogo, en "
                                   "cualquier estado, incluido Desarrollo. Elige otro."),
 }
