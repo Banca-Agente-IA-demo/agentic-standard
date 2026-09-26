@@ -11,8 +11,12 @@ punto ya existe.
 
 `has_evals` NACE EN FALSO, y es deliberado. El esqueleto siembra el archivo de la suite, pero lleno
 de marcadores: un archivo de `<<HAPPY_PATH_CASE>>` no es una suite, y decir que la tiene sería la
-misma clase de mentira que una descripción plausible en un artefacto sin terminar. Lo pone en cierto
-quien compruebe que la suite tiene casos de verdad.
+misma clase de mentira que una descripción plausible en un artefacto sin terminar.
+
+LO PONE EN CIERTO `publish`, no `validate`. Decidido el 26 de septiembre de 2026. El campo declara
+que el artefacto tiene comportamiento probado, y eso solo consta de una versión publicada: una suite
+que existe en una rama puede cambiar o desaparecer antes de fusionar. Mientras la unidad esté en
+Desarrollo el campo dice `false`, que es cierto.
 
 EL ESTADO NO SE ESCRIBE AQUÍ: la ficha de artefacto no tiene estado propio, lo espeja de su unidad a
 través de la relación. Una sola fuente para cada dato.

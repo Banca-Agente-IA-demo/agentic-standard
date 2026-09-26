@@ -23,6 +23,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from port_catalog.action_run import RunStatus, report_run
 from port_catalog.artifact_entity import register_artifacts, unregister_artifacts
 from port_catalog.client import PortClient
 from port_catalog.errors import CatalogError, UnitAlreadyRegisteredError
@@ -43,6 +44,10 @@ def _parse_args() -> argparse.Namespace:
                     help="Archivo JSON con el formulario ya normalizado.")
     ap.add_argument("--sha", required=True,
                     help="Commit de la rama sembrada. Es la clave de cruce con el repositorio.")
+    ap.add_argument("--branch", default="",
+                    help="Rama donde quedo el esqueleto. Se nombra en el resumen que lee el autor.")
+    ap.add_argument("--run-id", default="",
+                    help="Ejecucion de Port a la que devolver el resultado. Vacio fuera del autoservicio.")
     ap.add_argument("--verbose", "-v", action="store_true",
                     help="Activa logging DEBUG (detalles internos de ejecución).")
     return ap.parse_args()
@@ -88,7 +93,10 @@ def main() -> None:
             mcp_servers=request.mcp_servers,
         )
     except UnitAlreadyRegisteredError as exc:
+        # Dos autores fueron con el mismo nombre y este llegó segundo. La comprobación previa
+        # estrecha esa ventana pero no la cierra: la ficha nace aquí, al final.
         log.info("%s", exc)
+        _write_run_failure(client, args.run_id, str(exc))
         print(str(exc))
         sys.exit(_EXIT_NAME_TAKEN)
     except CatalogError as exc:
@@ -106,6 +114,45 @@ def main() -> None:
                              tuple(name for _, name, _ in _artifacts_of(request)))
         unregister_unit(client, request.name)
         sys.exit(_EXIT_CANNOT_REGISTER)
+
+    _write_run_success(client, args.run_id, request.name, args.branch)
+
+
+def _write_run_failure(client: PortClient, run_id: str, reason: str) -> None:
+    """Devuelve el motivo cuando el nombre ya tenía ficha.
+
+    Es el único error que este proceso puede explicar: lo demás que falle aquí es una avería nuestra,
+    y de esa se encarga el workflow. Ver `_write_run_success` para por qué no lanza si el aviso falla.
+    """
+    if not run_id:
+        return
+    try:
+        report_run(client, run_id, RunStatus.FAILURE, reason)
+    except CatalogError as error:
+        log.warning("no se pudo devolver el motivo a Port: %s", error)
+
+
+def _write_run_success(client: PortClient, run_id: str, unit_name: str, branch: str) -> None:
+    """Devuelve el resultado a la ejecución de Port, con dónde quedó la unidad.
+
+    POR QUÉ HACE FALTA, si Port ya cierra la ejecución solo. Port observa el workflow y la marca como
+    correcta, pero sin texto: el autor ve «correcta» y no dónde mirar. El resumen nombra la rama, que
+    es lo único que necesita para continuar.
+
+    POR QUÉ AQUÍ Y NO EN EL YAML. Es lo último que ocurre y quien tiene los datos. Un step más en el
+    workflow obligaría a exportar nombre y rama y a componer el texto en una expresión.
+
+    POR QUÉ NO LANZA SI FALLA. La unidad ya está sembrada y registrada. Convertir un fallo al avisar
+    en un fallo de la creación retiraría la rama y la ficha por culpa del canal de aviso.
+    """
+    if not run_id:
+        return
+    summary = ("La unidad %s se sembro en la rama %s y quedo registrada en estado Desarrollo."
+               % (unit_name, branch))
+    try:
+        report_run(client, run_id, RunStatus.SUCCESS, summary)
+    except CatalogError as error:
+        log.warning("no se pudo devolver el resultado a Port: %s", error)
 
 
 def _artifacts_of(request: UnitRequest) -> tuple[tuple[str, str, str], ...]:

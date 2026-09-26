@@ -142,11 +142,23 @@ jobs:
         run: printf '%s' "$NORMALIZED" > "$RUNNER_TEMP/normalized.json"
 
       - name: Registrar la unidad en el catálogo, en estado Desarrollo
+        id: register
         if: steps.create.outputs.validation-status == 'valid'
         uses: Banca-Agente-IA-demo/agentic-standard/.github/actions/register-unit@feat/create-unit-self-service
         with:
           payload-file: ${{ runner.temp }}/normalized.json
           sha: ${{ steps.commit.outputs.sha }}
+          branch: ${{ steps.branch.outputs.name }}
+          run-id: ${{ inputs.port_run_id }}
+
+      - name: Retirar la rama si el nombre ya tenía ficha
+        # Es el único caso en que la rama sobra y el fallo no es nuestro: dos autores fueron con el
+        # mismo nombre y este llegó segundo. La comprobación previa estrecha esa ventana pero no la
+        # cierra, porque la ficha nace al final. El motivo ya se devolvió a Port desde el registro.
+        if: steps.register.outputs.name-taken == 'true'
+        env:
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: git push origin --delete "$BRANCH"
 
       - name: Retirar la rama si algo falló después de publicarla
         # O existen la rama y la ficha, o no existe ninguna de las dos. Una rama sin ficha es

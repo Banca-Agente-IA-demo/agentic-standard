@@ -20,6 +20,14 @@ inputs:
   sha:
     description: Commit de la rama sembrada.
     required: true
+  branch:
+    description: Rama donde quedó el esqueleto. Se nombra en el resumen que lee el autor.
+    required: false
+    default: ""
+  run-id:
+    description: Ejecución de Port a la que devolver el resultado.
+    required: false
+    default: ""
 
 outputs:
   name-taken:
@@ -49,12 +57,14 @@ runs:
       env:
         PAYLOAD_FILE: ${{ inputs.payload-file }}
         SHA: ${{ inputs.sha }}
+        BRANCH: ${{ inputs.branch }}
+        RUN_ID: ${{ inputs.run-id }}
         STANDARD_TREE: ${{ github.action_path }}/../../..
       run: |
         set -euo pipefail
         set +e
         REASON="$(python "$STANDARD_TREE/tools/register_unit.py" \
-          --payload "$PAYLOAD_FILE" --sha "$SHA")"
+          --payload "$PAYLOAD_FILE" --sha "$SHA" --branch "$BRANCH" --run-id "$RUN_ID")"
         status=$?
         set -e
         # El código 3 es «el nombre ya tiene ficha», que no es una avería: se propaga como dato para
