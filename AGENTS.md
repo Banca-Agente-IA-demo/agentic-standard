@@ -528,6 +528,38 @@ nuevos van en inglés.
 
 Aplica al código nuevo. No dispara una migración masiva del existente.
 
+### D6 · El comentario es conciso y de registro formal
+
+Un comentario declara la decisión y su motivo en las frases que hagan falta y ni una más. No narra,
+no conversa, no se dirige al lector y no comenta su propia escritura.
+
+| | Fuera | Dentro |
+|---|---|---|
+| Registro | «ojo con esto», «cuidado», «aquí la magia», «obviamente» | El hecho y su consecuencia |
+| Persona | «como vimos», «si quieres», «no te fíes de» | Impersonal: «se resuelve», «no se repite» |
+| Énfasis | Signos de admiración, mayúsculas sostenidas para enfatizar | Negrita sobre la frase que decide |
+| Provisionalidad | «por ahora lo dejo así», «esto habría que mirarlo» | D4: qué está sin decidir y qué falta para decidirlo |
+
+**Conciso no significa corto.** Una decisión que previene un defecto concreto se explica entera,
+con la medición si la hay. Lo que sobra es lo que no aporta: el rodeo, la disculpa y la repetición
+de lo que la línea siguiente ya dice.
+
+```python
+# MAL · narra, conversa y no declara nada
+# Ojo!! aquí tuve que hacer un truco un poco raro porque si no fallaba, ya lo
+# miraremos con calma más adelante si eso
+
+# BIEN · declara la decisión, el motivo y dónde se midió
+# El identificador se busca por valor y no por clave: los tres clientes lo publican bajo nombres
+# distintos, y buscar una clave fija daría «no cruza» en dos de ellos. Medido el 25/09/2026.
+```
+
+Las mayúsculas sostenidas sí valen para **una advertencia que cambia la lectura de lo que sigue**
+(`EL IMPORT VA DENTRO Y NO ARRIBA`, `NO SE USA shutil.which`), que es como las usa el código de
+ejemplo. No valen como tono.
+
+Aplica igual a los docstrings, a los mensajes de aserción (PR5) y a los resúmenes de CI.
+
 ---
 
 ## 7. Errores
@@ -987,6 +1019,7 @@ autoexplicativo en la UI sin abrir el log: `Install dependencias del proveedor (
 - [ ] Las correcciones dejan constancia de dónde se midieron. (D2)
 - [ ] El docstring del módulo tiene secciones y cita su fuente. (D3)
 - [ ] Lo pendiente o sin decidir se dice en el sitio. (D4)
+- [ ] Los comentarios son concisos y de registro formal; sin narrativa ni tono coloquial. (D6)
 - [ ] Identificadores en inglés, prosa en español; sin tocar los cuatro identificadores del gate, los cinco workflows reutilizables ni las claves persistidas. (D5)
 
 **Errores**

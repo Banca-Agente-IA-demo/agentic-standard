@@ -66,8 +66,10 @@ def main() -> None:
         request = UnitRequest.model_validate(
             json.loads(args.payload.read_text(encoding="utf-8")))
     except (OSError, json.JSONDecodeError, ValidationError, SeedError) as exc:
-        # Aquí el payload ya pasó por la frontera en el job de validación, así que un fallo ahora es
-        # un defecto nuestro y no del formulario.
+        # Decía «en el job de validación». Corregido al converger create-unit a un solo job: lo que
+        # cruza la frontera es el step de creación, no un job aparte.
+        # Aquí el payload ya la cruzó, así que un fallo ahora es un defecto nuestro y no del
+        # formulario.
         log.error("el payload normalizado no se pudo releer", exc_info=exc)
         sys.exit(_EXIT_CANNOT_REGISTER)
 
